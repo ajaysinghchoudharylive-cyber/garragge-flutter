@@ -162,4 +162,77 @@ class ServiceItemCard extends StatelessWidget{
       ),
     );
   }
+
+  Widget _buildImageAndCart(CategoryItem item) {
+  return Column(
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          item.media.isNotEmpty ? item.media.first.mediaUrl : '',
+          height: 120,
+          width: 120,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const Icon(Icons.car_repair, size: 80),
+        ),
+      ),
+      const SizedBox(height: 8),
+
+      quantity == 0 ? _buildAddButton() : _buildQuantitySelector(),
+    ],
+  );
+}
+
+Widget _buildAddButton() {
+  return SizedBox(
+    width: 120,
+    child: ElevatedButton(
+      onPressed: () {
+        setState(() {
+          quantity = 1;
+        });
+      },
+      child: const Text('ADD'),
+    ),
+  );
+}
+
+Widget _buildQuantitySelector() {
+  return Container(
+    width: 120,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.blue),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.remove, size: 18),
+          onPressed: () {
+            setState(() {
+              quantity--;
+              if (quantity < 0) quantity = 0;
+            });
+          },
+        ),
+        Text(
+          quantity.toString(),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        IconButton(
+          icon: const Icon(Icons.add, size: 18),
+          onPressed: () {
+            setState(() {
+              quantity++;
+            });
+          },
+        ),
+      ],
+    ),
+  );
+}
+
 }
