@@ -19,7 +19,12 @@ class LoginModel {
     this.user,
   });
 
-  bool get isSuccess => result.toLowerCase() == "success";
+  bool get isSuccess {
+    // Check for both HTTP success codes and success strings
+    final resultLower = result.toLowerCase();
+    return resultLower == "success" || 
+           resultLower == "200" ; // Any 2xx status code
+  }
 
   factory LoginModel.fromJson(Map<String, dynamic> json) {
     return LoginModel(

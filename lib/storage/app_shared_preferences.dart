@@ -6,6 +6,7 @@ class AppSharedPreferences {
 
   AppSharedPreferences(this.prefs);
 
+  // Setters
   Future<void> saveUserId(String id) async =>
       prefs.setString('user_id', id);
 
@@ -29,4 +30,36 @@ class AppSharedPreferences {
 
   Future<void> savePremium(bool? value) async =>
       prefs.setBool('is_premium', value ?? false);
+
+  Future<void> saveSelectedLocation(String address, String? title) async {
+    await prefs.setString('selected_address', address);
+    if (title != null) {
+      await prefs.setString('selected_address_title', title);
+    }
+  }
+
+  // Getters
+  String? getUserId() => prefs.getString('user_id');
+  String? getUsername() => prefs.getString('username');
+  String? getPolicies() => prefs.getString('policies');
+  String? getTerms() => prefs.getString('terms');
+  bool getIsLoggedIn() => prefs.getBool('is_logged_in') ?? false;
+  String? getDealerCity() => prefs.getString('city');
+  String? getDealerState() => prefs.getString('state');
+  bool getIsPremium() => prefs.getBool('is_premium') ?? false;
+  String? getSelectedAddress() => prefs.getString('selected_address');
+  String? getSelectedAddressTitle() => prefs.getString('selected_address_title');
+
+  // Logout - Clear all user data
+  Future<void> logout() async {
+    await prefs.remove('user_id');
+    await prefs.remove('username');
+    await prefs.remove('city');
+    await prefs.remove('state');
+    await prefs.remove('is_premium');
+    await prefs.remove('selected_address');
+    await prefs.remove('selected_address_title');
+    await prefs.setBool('is_logged_in', false);
+    // Keep policies and terms as they're not user-specific
+  }
 }

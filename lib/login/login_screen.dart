@@ -1,7 +1,6 @@
 import 'dart:io';
+import 'package:carsbuzz/auth/firebase_auth_service.dart';
 import 'package:carsbuzz/login/otp_screen.dart';
-import 'package:carsbuzz/network/repository_api.dart';
-import 'package:carsbuzz/repository/auth_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_number/mobile_number.dart';
@@ -18,15 +17,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _isValidPhone = false;
-  late final RepositoryApi _api;
 
   List<String> _mobileNumbers = [];
-  late final AuthRepo _authRepo;
 
   @override
   void initState() {
     super.initState();
-    _authRepo = AuthRepo();
     _autoDetectPhoneNumber();
   }
 
@@ -84,27 +80,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    _authRepo.sendOtp(
-      phone: _phoneController.text,
-      onSuccess: (data) {
+    FirebaseAuthService.sendOTP(
+      phoneNumber: _phoneController.text,
+      onCodeSent: () {
         if (!mounted) return;
-
+        
+        setState(() => _isLoading = false);
+        
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => OtpScreen(phoneNumber: _phoneController.text),
-        )
+          MaterialPageRoute(
+            builder: (_) => OtpScreen(phoneNumber: _phoneController.text),
+          ),
         );
-
-        setState(() => _isLoading = false);
       },
       onError: (message) {
         if (!mounted) return;
-
+        
         setState(() => _isLoading = false);
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       },
     );
   }

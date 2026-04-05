@@ -100,4 +100,80 @@ class CategoryItem {
       couponCode: json['couponCode'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'itemName': itemName,
+      'price': price,
+      'discount': discount,
+      'itemIcon': itemIcon,
+      'warranty': warranty.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'facilities': facilities.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'freebies': freebies.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'media': media.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'coupons': coupons.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'faqs': faqs.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'bookingSteps': bookingSteps.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'terms': terms.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'warrantiesDetails': warrantiesDetails.map((e) {
+        try {
+          return (e as dynamic).toJson();
+        } catch (_) {
+          return {};
+        }
+      }).toList(),
+      'categoryName': categoryName,
+      'couponPrice': couponPrice,
+      'couponCode': couponCode,
+    };
+  }
 }

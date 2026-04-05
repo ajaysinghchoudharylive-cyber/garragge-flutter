@@ -1,12 +1,11 @@
 import 'package:carsbuzz/home/category_tab.dart';
 import 'package:carsbuzz/home/home_repo.dart';
 import 'package:carsbuzz/home/service_item_card.dart';
-import 'package:carsbuzz/models/category_item.dart';
 import 'package:carsbuzz/models/category_response.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  HomeScreen({super.key}); // ❗ NOT const
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -15,9 +14,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final HomeRepo _repo = HomeRepo();
 
-  List<CategoryResponse> _categories = [];
-  List<CategoryItem> _items = [];
+  final ScrollController _listController = ScrollController();
+  final Map<int, GlobalKey> _categoryKeys = {};
 
+  List<CategoryResponse> _categories = [];
   int _selectedIndex = 0;
   bool _loading = true;
 
@@ -28,28 +28,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _loadHome() {
-    debugPrint('HomeScreen: _loadHome called');
-
     _repo.fetchHomeData(
       onSuccess: (data) {
-        debugPrint('HomeScreen: onSuccess called');
+        if (!mounted) return;
+
+        _categoryKeys.clear();
+        for (int i = 0; i < data.length; i++) {
+          _categoryKeys[i] = GlobalKey();
+        }
+
         setState(() {
           _categories = data;
-          _items = data.first.items;
           _loading = false;
         });
       },
-      onError: (e) {
-        debugPrint('HomeScreen: onError called -> $e');
+      onError: (_) {
+        if (!mounted) return;
         setState(() => _loading = false);
       },
     );
   }
 
   void _onCategoryTap(int index) {
-    setState(() {
-      _selectedIndex = index;
-      _items = _categories[index].items;
+    if (index < 0 || index >= _categories.length) return;
+
+    setState(() => _selectedIndex = index);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = _categoryKeys[index]?.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+      }
     });
   }
 
@@ -69,35 +82,59 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           _buildCategoryTabs(),
-          Expanded(child: _buildItemsList()),
+          Expanded(child: _buildCategoryList()),
         ],
       ),
     );
   }
 
-  // 🔹 CATEGORY TABS (Ceramic / PPF)
+  // ✅ NO Row, NO Expanded, NO Flex problems
   Widget _buildCategoryTabs() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: List.generate(_categories.length, (index) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        scrollDirection: Axis.horizontal,
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
           return CategoryTab(
             title: _categories[index].itemCategory,
             isSelected: index == _selectedIndex,
             onTap: () => _onCategoryTap(index),
           );
-        }),
+        },
       ),
     );
   }
 
-  // 🔹 SERVICE ITEMS LIST
-  Widget _buildItemsList() {
+  Widget _buildCategoryList() {
     return ListView.builder(
+      controller: _listController,
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: _items.length,
+      itemCount: _categories.length,
       itemBuilder: (context, index) {
-        return ServiceItemCard(item: _items[index]);
+        final category = _categories[index];
+
+        return Column(
+          key: _categoryKeys[index],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12,0),
+              child: Text(
+                category.itemCategory,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ...category.items.map(
+              (item) => ServiceItemCard(item: item),
+            ),
+          ],
+        );
       },
     );
   }

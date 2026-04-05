@@ -14,24 +14,28 @@ class CategoryTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 44,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.black87 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.black54),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.black : Colors.grey.shade300,
           ),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.black,
-              fontWeight: FontWeight.w600,
-            ),
+        ),
+        child: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            color: isSelected ? Colors.white : Colors.black,
           ),
         ),
       ),

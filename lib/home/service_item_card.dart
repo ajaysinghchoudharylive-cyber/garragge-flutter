@@ -21,7 +21,7 @@ class _ServiceItemCardState extends State<ServiceItemCard> {
     final item = widget.item;
 
     return Card(
-      margin: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(8,8,8,8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(8),

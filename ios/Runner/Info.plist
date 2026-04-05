@@ -5,7 +5,15 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
-	<true/>
+	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location to provide delivery services at your current location.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs access to location to provide delivery services at your current location.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
