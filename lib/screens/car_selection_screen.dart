@@ -250,56 +250,106 @@ class _CarSelectionScreenState extends State<CarSelectionScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Your Car'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+@override
+Widget build(BuildContext context) {
+  return DraggableScrollableSheet(
+    initialChildSize: 0.75,
+    minChildSize: 0.5,
+    maxChildSize: 0.95,
+    expand: false,
+    builder: (context, scrollController) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+
+            /// 🔥 DRAG HANDLE (optional but recommended)
+            Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 6),
+              height: 4,
+              width: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+
+            /// 🔥 TOP HEADER + SAVE BUTTON
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
                 children: [
-                  const Text(
-                    'Select Car Brand',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSearchField(),
-                  const SizedBox(height: 16),
-                  _buildBrandSelection(),
-                  if (_selectedBrand != null) ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Select Model',
+                  const Expanded(
+                    child: Text(
+                      'Select Car Brand',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildModelSelection(),
-                  ],
+                  ),
+                  ElevatedButton(
+                    onPressed: (_selectedBrand != null && _selectedModel != null)
+                        ? _addCar
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                    ),
+                    child: const Text("Save", style: TextStyle(color: Colors.white)),
+                  ),
                 ],
               ),
             ),
-          ),
-          _buildBottomButton(),
-        ],
-      ),
-    );
-  }
 
+            /// 🔥 SEARCH
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildSearchField(),
+            ),
+
+            const SizedBox(height: 12),
+
+            /// 🔥 SCROLLABLE CONTENT
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController, // 🔥 VERY IMPORTANT
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    _buildBrandSelection(),
+
+                    if (_selectedBrand != null) ...[
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Select Model',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildModelSelection(),
+                    ],
+
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
   Widget _buildSearchField() {
     return Container(
       decoration: BoxDecoration(
@@ -345,16 +395,9 @@ class _CarSelectionScreenState extends State<CarSelectionScreen> {
               controller: _searchController,
               enabled: _selectedBrand == null, // Disable when brand is selected
               decoration: InputDecoration(
-                hintText: _selectedBrand != null 
-                    ? 'Brand selected - choose a model below' 
-                    : 'Search car brands...',
                 hintStyle: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 14,
-                ),
-                prefixIcon: Icon(
-                  _selectedBrand != null ? Icons.check_circle : Icons.search,
-                  color: _selectedBrand != null ? Colors.green : Colors.grey,
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -524,11 +567,6 @@ class _CarSelectionScreenState extends State<CarSelectionScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.green,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.check, color: Colors.white, size: 16),
           ),
         ],
       ),
@@ -607,9 +645,9 @@ class _CarSelectionScreenState extends State<CarSelectionScreen> {
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
+                              height: 60,
+                              width: 60,
                               model.imageUrl!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   decoration: BoxDecoration(
@@ -661,15 +699,7 @@ class _CarSelectionScreenState extends State<CarSelectionScreen> {
                   Container(
                     margin: const EdgeInsets.only(bottom: 4),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 14,
-                    ),
+                    
                   ),
               ],
             ),
@@ -745,17 +775,12 @@ class _CarSelectionScreenState extends State<CarSelectionScreen> {
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.check_circle,
-                      color: Colors.green.shade600,
-                      size: 24,
-                    ),
                   ],
                 ),
               ),
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 40,
               child: ElevatedButton(
                 onPressed: canAdd && !_isSaving ? _addCar : null,
                 style: ElevatedButton.styleFrom(
