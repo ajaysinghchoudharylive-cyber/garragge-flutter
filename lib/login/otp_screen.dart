@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:carsbuzz/auth/firebase_auth_service.dart';
-import 'package:carsbuzz/home/new_home_screen.dart';
+import 'package:carsbuzz/sellcar/sell_car_home_screen.dart';
 import 'package:carsbuzz/network/api_client.dart';
 import 'package:carsbuzz/network/firebase_service.dart';
 import 'package:carsbuzz/network/repository_api.dart';
@@ -115,12 +115,12 @@ class _OtpScreenState extends State<OtpScreen> {
           setState(() => _isLoading = false);
           
           // Navigate to home screen
-          print('🔍 Navigating to NewHomeScreen...');
+          print('🔍 Navigating to SellCarHomeScreen...');
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) {
-              print('🔍 Creating NewHomeScreen...');
-              return const NewHomeScreen();
+              print('🔍 Creating SellCarHomeScreen...');
+              return const SellCarHomeScreen();
             }),
             (route) => false,
           );

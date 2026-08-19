@@ -1,5 +1,5 @@
-import 'package:carsbuzz/home/new_home_screen.dart';
 import 'package:carsbuzz/login/login_screen.dart';
+import 'package:carsbuzz/sellcar/sell_car_home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -52,7 +52,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // Route based on authentication status
-    return _isLoggedIn ? const NewHomeScreen() : const LoginScreen();
+    // Route to SellCarHomeScreen (main dashboard with bottom nav) for logged-in users
+    return _isLoggedIn ? const SellCarHomeScreen() : const LoginScreen();
   }
 }

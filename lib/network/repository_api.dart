@@ -4,6 +4,10 @@ import 'package:carsbuzz/models/address_request.dart';
 import 'package:carsbuzz/models/address_response.dart';
 import 'package:carsbuzz/models/toggle_address_status_request.dart';
 import 'package:carsbuzz/models/banner_data_response.dart';
+import 'package:carsbuzz/models/car_listing_model.dart';
+import 'package:carsbuzz/models/car_listing_response.dart';
+import 'package:carsbuzz/models/sell_car_request.dart';
+import 'package:carsbuzz/models/car_brand_model.dart';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
@@ -52,4 +56,46 @@ abstract class RepositoryApi {
   // Banners API
   @GET(ApiConstants.carDetailingBanners)
   Future<List<BannerDataResponse>> getBanners();
+  
+  // Car Brands & Models
+  @GET(ApiConstants.carBrands)
+  Future<List<CarBrandModel>> getCarBrands();
+  
+  @GET(ApiConstants.carModels)
+  Future<List<String>> getCarModels(
+    @Path("brandName") String brandName,
+  );
+  
+  @GET(ApiConstants.carVariants)
+  Future<List<String>> getCarVariants(
+    @Path("brandName") String brandName,
+    @Path("modelName") String modelName,
+  );
+  
+  // Sell Car APIs
+  @POST(ApiConstants.sellCarPost)
+  Future<Map<String, dynamic>> postSellCar(
+    @Body() SellCarRequest request,
+  );
+  
+  // Car Listing APIs
+  @GET(ApiConstants.carListing)
+  Future<CarListingResponse> getCarListing(
+    @Queries() Map<String, dynamic> queryParams,
+  );
+  
+  @GET(ApiConstants.carDetails)
+  Future<CarListingModel> getCarDetails(
+    @Path("carId") int carId,
+  );
+  
+  @POST(ApiConstants.toggleFavorite)
+  Future<void> toggleFavorite(
+    @Body() Map<String, dynamic> body,
+  );
+  
+  @GET(ApiConstants.getFavorites)
+  Future<List<int>> getFavorites(
+    @Path("userId") int userId,
+  );
 }

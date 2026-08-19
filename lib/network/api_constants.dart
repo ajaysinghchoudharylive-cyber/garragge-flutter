@@ -19,11 +19,23 @@ class ApiConstants {
   static const String carDetailingBanners = "banners";
   
   // Selected Cars
-  static const String selectedCars = "cars/users/{userId}/selected-cars"; // Kept for backward compatibility
-  static const String getSelectedCars = "cars/{userId}/selected-cars"; // GET endpoint
-  static const String postSelectedCars = "cars/users/{userId}/selected-cars"; // POST endpoint
+  static const String selectedCars = "cars/users/{userId}/selected-cars";
+  static const String getSelectedCars = "cars/{userId}/selected-cars";
+  static const String postSelectedCars = "cars/users/{userId}/selected-cars";
   
   // Car Brands and Models
   static const String carBrands = "cars/carLogoAndNames";
   static const String carModels = "cars/cars/{brandName}/models";
+  static const String carVariants = "cars/cars/{brandName}/{modelName}/variants";
+  
+  // Sell Car
+  static const String sellCarPost = "cars/sell-car";
+  static const String sellCarDraft = "cars/sell-car/draft/{userId}";
+  static const String uploadCarImage = "cars/sell-car/upload-image";
+  
+  // Car Listing (Buy Car)
+  static const String carListing = "cars/car-listing";
+  static const String carDetails = "cars/car-details/{carId}";
+  static const String toggleFavorite = "cars/favorites/toggle";
+  static const String getFavorites = "cars/favorites/{userId}";
 }

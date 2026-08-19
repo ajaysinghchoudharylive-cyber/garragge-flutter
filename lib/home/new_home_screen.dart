@@ -10,6 +10,8 @@ import 'package:carsbuzz/repository/selected_cars_repo.dart';
 import 'package:carsbuzz/screens/car_selection_screen.dart';
 import 'package:carsbuzz/widgets/refer_and_earn_widget.dart';
 import 'package:carsbuzz/widgets/selected_cars_modal.dart';
+import 'package:carsbuzz/carlisting/car_listing_screen.dart';
+import 'package:carsbuzz/sellcar/sell_car_wizard_screen.dart';
 import '../screens/refer_and_earn_screen.dart';
 import 'package:carsbuzz/widgets/location_selection_bottom_sheet.dart';
 import 'package:carsbuzz/storage/app_shared_preferences.dart';
@@ -732,10 +734,20 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
               // Already on home
               break;
             case 1:
-              // Navigate to buy car
+              // Navigate to buy car (car listing)
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const CarListingScreen()),
+              );
               break;
             case 2:
-              // Navigate to sell car
+              // Navigate to sell car wizard
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SellCarWizardScreen()),
+              );
               break;
             case 3:
               // Navigate to profile
