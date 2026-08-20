@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "400806372019",
+    "project_id": "carsbuzz-a724f",
+    "storage_bucket": "carsbuzz-a724f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400806372019:android:6e700bd5949c30dc3b06c6",
+        "android_client_info": {
+          "package_name": "com.acho.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBx7AA4JF6K4XcCO15Uv3qQbe91-9bREvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
