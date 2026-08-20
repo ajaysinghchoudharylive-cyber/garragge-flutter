@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:carsbuzz/auth/firebase_auth_service.dart';
 import 'package:carsbuzz/login/otp_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_number/mobile_number.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,37 +16,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isValidPhone = false;
 
-  List<String> _mobileNumbers = [];
-
   @override
   void initState() {
     super.initState();
-    _autoDetectPhoneNumber();
-  }
-
-  // 🔹 Auto-detect phone number (Android only)
-  Future<void> _autoDetectPhoneNumber() async {
-    if (!Platform.isAndroid) return;
-
-    try {
-      final numbers = await MobileNumber.getSimCards;
-      if (numbers == null || numbers.isEmpty) return;
-
-      final extracted = numbers
-          .map((e) => e.number)
-          .whereType<String>()
-          .map(_sanitizeNumber)
-          .where(_isPhoneValid)
-          .toList();
-
-      if (!mounted || extracted.isEmpty) return;
-
-      setState(() {
-        _mobileNumbers = extracted;
-        _phoneController.text = extracted.first;
-        _isValidPhone = true;
-      });
-    } catch (_) {}
   }
 
   // 🔹 Sanitize input
@@ -194,25 +164,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-
-                // Detected numbers (dual SIM)
-                if (_mobileNumbers.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Wrap(
-                      spacing: 8,
-                      children: _mobileNumbers.map((number) {
-                        return ActionChip(
-                          label: Text(number),
-                          onPressed: () {
-                            _phoneController.text = number;
-                            _isValidPhone = true;
-                            setState(() {});
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
 
                 const SizedBox(height: 30),
 

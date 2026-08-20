@@ -62,8 +62,8 @@ class NewHomeRepo {
 
       return {
         'currentAddress': results[0] as AddressResponse?,
-        'banners': results[1] as List<BannerDataResponse>,
-        'categories': results[2] as List<CategoryResponse>,
+        'banners': results[1],
+        'categories': results[2],
       };
     } catch (e) {
       debugPrint('Error fetching home data: $e');

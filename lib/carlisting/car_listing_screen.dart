@@ -661,8 +661,8 @@ class _SortBottomSheet extends StatelessWidget {
                   ? const Icon(Icons.check, color: Color(0xFF1A73E8))
                   : null,
               onTap: () => onSortSelected(
-                option['sortBy'] as String?,
-                option['direction'] as String?,
+                option['sortBy'],
+                option['direction'],
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
