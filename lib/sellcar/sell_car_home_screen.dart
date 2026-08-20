@@ -52,25 +52,29 @@ class _SellCarHomeScreenState extends State<SellCarHomeScreen> {
   }
 
   Widget _buildBody() {
-    switch (_currentIndex) {
-      case 0:
-        return SellCarDashboard(
-          city: _city,
-          onSellCarTap: () => _onTabTapped(2),
-          onBuyCarTap: () => setState(() => _currentIndex = 1),
-        );
-      case 1:
-        return const CarListingScreen();
-      case 3:
-        return const ProfileScreen();
-      case 4:
-        return _buildSupportScreen();
-      default:
-        return SellCarDashboard(
-          city: _city,
-          onSellCarTap: () => _onTabTapped(2),
-          onBuyCarTap: () => setState(() => _currentIndex = 1),
-        );
+    try {
+      switch (_currentIndex) {
+        case 0:
+          return SellCarDashboard(
+            city: _city,
+            onSellCarTap: () => _onTabTapped(2),
+            onBuyCarTap: () => setState(() => _currentIndex = 1),
+          );
+        case 1:
+          return const CarListingScreen();
+        case 3:
+          return const ProfileScreen();
+        case 4:
+          return _buildSupportScreen();
+        default:
+          return SellCarDashboard(
+            city: _city,
+            onSellCarTap: () => _onTabTapped(2),
+            onBuyCarTap: () => setState(() => _currentIndex = 1),
+          );
+      }
+    } catch (e) {
+      return Center(child: Text('Error: $e'));
     }
   }
 

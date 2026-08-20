@@ -47,14 +47,16 @@ class _SellCarDashboardState extends State<SellCarDashboard> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(child: _buildBanner()),
-          SliverToBoxAdapter(child: _buildQuickActions()),
-          SliverToBoxAdapter(child: _buildHowItWorksSection()),
-          SliverToBoxAdapter(child: _buildWhySellWithUs()),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildBanner(),
+            _buildQuickActions(),
+            _buildHowItWorksSection(),
+            _buildWhySellWithUs(),
+          ],
+        ),
       ),
     );
   }
