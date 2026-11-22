@@ -49,6 +49,8 @@ dependencies:
   flutter_svg: ^2.0.10
   # Opens Terms / Privacy / news articles in the browser.
   url_launcher: ^6.3.0
+  # Share sheet for "Share Car Ad".
+  share_plus: ^10.1.4
 
 
   # The following adds the Cupertino Icons font to your application.

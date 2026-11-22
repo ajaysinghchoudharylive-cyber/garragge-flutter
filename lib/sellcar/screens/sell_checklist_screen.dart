@@ -1,3 +1,4 @@
+import 'package:carsbuzz/myads/my_ads_screen.dart';
 import 'package:carsbuzz/sellcar/sell_car_flow.dart';
 import 'package:carsbuzz/sellcar/sell_car_wizard_screen.dart' show showUploadLimitDialog;
 import 'package:carsbuzz/sellcar/widgets/sell_ui.dart';
@@ -123,7 +124,7 @@ class _SellChecklistScreenState extends State<SellChecklistScreen> {
 
     if (result.success) {
       _flow.posted = true;
-      await showModalBottomSheet<void>(
+      final choice = await showModalBottomSheet<String>(
         context: context,
         isDismissible: false,
         enableDrag: false,
@@ -133,7 +134,12 @@ class _SellChecklistScreenState extends State<SellChecklistScreen> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => const _SuccessSheet(),
       );
-      if (mounted) SellCarFlow.popTo(context, null);
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      SellCarFlow.popTo(context, null);
+      if (choice == 'myads') {
+        navigator.push(MaterialPageRoute(builder: (_) => const MyAdsScreen()));
+      }
     } else if (result.isUploadLimitReached) {
       await showUploadLimitDialog(context, result.message);
     } else {
@@ -372,6 +378,14 @@ class _SuccessSheet extends StatelessWidget {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).pop('myads'),
+              icon: const Icon(Icons.document_scanner_outlined, size: 20, color: SellColors.green),
+              label: const Text('View my ads',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700, color: SellColors.green)),
             ),
           ],
         ),

@@ -1,6 +1,7 @@
 import 'package:carsbuzz/auth/firebase_auth_service.dart';
 import 'package:carsbuzz/login/login_screen.dart';
 import 'package:carsbuzz/login/login_session.dart';
+import 'package:carsbuzz/myads/my_ads_screen.dart';
 import 'package:carsbuzz/storage/app_shared_preferences.dart';
 import 'package:carsbuzz/theme/app_colors.dart';
 import 'package:carsbuzz/widgets/app_ui.dart';
@@ -234,7 +235,8 @@ class _MoreScreenState extends State<MoreScreen> {
                   children: [
                     _row(Icons.directions_car_outlined, const Color(0xFFEBF5FF),
                         AppColors.brandBlue, 'My Ads', 'Manage your car advertisements', () {
-                      showAppSnackBar(context, 'My Ads is not available in this app yet.');
+                      Navigator.of(context)
+                          .push(MaterialPageRoute(builder: (_) => const MyAdsScreen()));
                     }),
                     _divider(),
                     _row(Icons.privacy_tip_outlined, const Color(0xFFF5F3FF),

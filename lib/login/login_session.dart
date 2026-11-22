@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Where to land after a successful login (Android: LOGIN_ORIGIN).
-enum LoginOrigin { home, more, sell }
+enum LoginOrigin { home, more, sell, buy }
 
 /// Backend login after Firebase verified the number. Mirrors the Android LoginRepo: POST
 /// cars/login/signup {phone, firebaseToken}, then save the user + JWT pair.
@@ -58,7 +58,11 @@ class LoginSession {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => MainShell(
-          initialTab: origin == LoginOrigin.more ? MainShell.tabMore : MainShell.tabDashboard,
+          initialTab: switch (origin) {
+            LoginOrigin.more => MainShell.tabMore,
+            LoginOrigin.buy => MainShell.tabBuy,
+            _ => MainShell.tabDashboard,
+          },
           openSellOnStart: origin == LoginOrigin.sell,
         ),
       ),

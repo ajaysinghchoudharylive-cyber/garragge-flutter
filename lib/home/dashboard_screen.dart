@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:carsbuzz/carlisting/car_api.dart';
 import 'package:carsbuzz/carlisting/car_listing_screen.dart';
+import 'package:carsbuzz/home/city_selection_sheet.dart';
 import 'package:carsbuzz/home/dashboard_repository.dart';
+import 'package:carsbuzz/notifications/notifications_screen.dart';
 import 'package:carsbuzz/home/widgets/find_cars_card.dart';
 import 'package:carsbuzz/models/car_brand_model.dart';
 import 'package:carsbuzz/theme/app_colors.dart';
-import 'package:carsbuzz/widgets/location_selection_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -29,6 +31,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ];
 
   String _area = '';
+  bool _loggedIn = false;
+  int _unread = 0;
   int _hintIndex = 0;
   Timer? _hintTimer;
 
@@ -48,6 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) setState(() => _hintIndex = (_hintIndex + 1) % _searchHints.length);
     });
     _loadArea();
+    _loadUnread();
     _load();
   }
 
@@ -61,7 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _area = prefs.getString('selected_address_title') ?? prefs.getString('city') ?? '';
+      // The city sheet saves the picked city in 'city' (Android getCity()).
+      _area = prefs.getString('city') ?? '';
     });
   }
 
@@ -95,6 +101,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String? transmission,
     String? minPrice,
     String? maxPrice,
+    String? bodyType,
+    bool isFromSearch = false,
   }) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => CarListingScreen(
@@ -104,24 +112,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         initialTransmission: transmission,
         initialMinPrice: minPrice,
         initialMaxPrice: maxPrice,
+        initialBodyType: bodyType,
+        isFromSearch: isFromSearch,
       ),
     ));
   }
 
-  void _onLocationTap() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => LocationSelectionBottomSheet(
-        onLocationSelected: (address, title) async {
-          final value = title ?? address;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('city', value);
-          if (mounted) setState(() => _area = value);
-        },
-      ),
-    );
+  /// Android HomeSellCarFragment.onAddLocationClick -> CitySelectionBottomSheet.
+  Future<void> _onLocationTap() async {
+    await CitySelectionSheet.show(context);
+    _loadArea();
+  }
+
+  Future<void> _loadUnread() async {
+    final prefs = await SharedPreferences.getInstance();
+    final loggedIn = prefs.getBool('is_logged_in') ?? false;
+    final count = loggedIn ? await CarApi.unreadCount() : 0;
+    if (mounted) {
+      setState(() {
+        _loggedIn = loggedIn;
+        _unread = count;
+      });
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    _loadUnread();
   }
 
   Future<void> _onSearchTap() async {
@@ -129,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       MaterialPageRoute(builder: (_) => _SearchScreen(suggestions: _suggestions)),
     );
     if (picked != null && mounted) {
-      _openListing(brand: picked.brand, model: picked.model);
+      _openListing(brand: picked.brand, model: picked.model, isFromSearch: true);
     }
   }
 
@@ -161,6 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onExplore: (s) => _openListing(
                           fuel: s.fuelType,
                           transmission: s.transmission,
+                          bodyType: s.bodyType,
                           minPrice: s.minPrice,
                           maxPrice: s.maxPrice,
                         ),
@@ -215,6 +234,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
+                // Bell + unread badge, only for logged-in users (Android ivBell).
+                if (_loggedIn)
+                  GestureDetector(
+                    onTap: _openNotifications,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 16),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(Icons.notifications_none, size: 24, color: Colors.black),
+                          if (_unread > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(
+                                    color: AppColors.badgeRed, shape: BoxShape.circle),
+                                child: Text(
+                                  _unread > 99 ? '9+' : '$_unread',
+                                  style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -373,7 +425,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               itemBuilder: (context, i) {
                 final m = _popular[i];
                 return GestureDetector(
-                  onTap: () => _openListing(brand: m.brand, model: m.modelName),
+                  onTap: () =>
+                      _openListing(brand: m.brand, model: m.modelName, isFromSearch: true),
                   child: Card(
                     margin: const EdgeInsets.all(8),
                     elevation: 2,
