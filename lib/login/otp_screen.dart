@@ -1,22 +1,30 @@
 import 'dart:async';
+
 import 'package:carsbuzz/auth/firebase_auth_service.dart';
-import 'package:carsbuzz/sellcar/sell_car_home_screen.dart';
-import 'package:carsbuzz/network/api_client.dart';
-import 'package:carsbuzz/network/firebase_service.dart';
-import 'package:carsbuzz/network/repository_api.dart';
-import 'package:carsbuzz/models/signup_user_model.dart';
-import 'package:carsbuzz/network/token_store.dart';
-import 'package:flutter/foundation.dart';
+import 'package:carsbuzz/login/login_session.dart';
+import 'package:carsbuzz/login/profile_details_screen.dart';
+import 'package:carsbuzz/theme/app_colors.dart';
+import 'package:carsbuzz/widgets/app_ui.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+/// "Verify Mobile Number" screen, a port of the Android OtpVerification fragment
+/// (fragment_otp_verification_layout.xml + otp_boxes_layout.xml):
+/// - the OTP is sent as soon as the screen opens ("OTP is sending..." -> "OTP sent"),
+/// - six masked boxes, disabled until the code is sent, auto-submit on the 6th digit,
+/// - 2-minute resend timer, then "Didn't receive OTP? Resend" (one resend, like Android),
+/// - 3 wrong attempts, then back to the number screen,
+/// - back/close is blocked while the timer runs.
 class OtpScreen extends StatefulWidget {
+  /// Raw 10-digit number typed on the login screen.
   final String phoneNumber;
+  final LoginOrigin origin;
 
   const OtpScreen({
     super.key,
     required this.phoneNumber,
+    this.origin = LoginOrigin.home,
   });
 
   @override
@@ -24,348 +32,458 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  final List<TextEditingController> _controllers =
-      List.generate(6, (_) => TextEditingController());
+  static const int _maxWrongAttempts = 3;
+  static const int _timerSeconds = 120;
 
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-  final RepositoryApi _api = ApiClient.create();
+  final TextEditingController _otpController = TextEditingController();
+  final FocusNode _otpFocus = FocusNode();
 
-  int _secondsRemaining = 15;
   Timer? _timer;
-  bool _isLoading = false;
+  int _secondsLeft = 0;
+  bool _isTimerRunning = false;
+  bool _canSendOtp = false; // true once the timer has finished
+  bool _codeSent = false;
+  bool _loading = true; // sending the code / verifying
+  bool _isSubmitting = false;
+  bool _verified = false;
+  bool _attemptsExhausted = false;
+  int _wrongAttempts = 0;
+  int _sendCount = 1; // same counter as Android: a resend is refused once it reaches 3
 
-  bool get _isOtpComplete => _controllers.every((c) => c.text.isNotEmpty);
+  String get _displayNumber => FirebaseAuthService.e164(widget.phoneNumber);
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    _secondsRemaining = 15;
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_secondsRemaining == 0) {
-        timer.cancel();
-      } else {
-        setState(() => _secondsRemaining--);
-      }
+    _otpController.addListener(_onOtpChanged);
+    _otpFocus.addListener(() {
+      if (mounted) setState(() {});
     });
-  }
-
-  void _onOtpChanged(int index, String value) {
-    if (value.isNotEmpty && index < 5) {
-      _focusNodes[index + 1].requestFocus();
-    }
-    if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
-    }
-    setState(() {});
-  }
-
-  String get _otp => _controllers.map((c) => c.text).join();
-
-  Future<void> _callLoginAPI() async {
-    try {
-      print('🔍 Starting _callLoginAPI');
-      // Get Firebase token
-      final firebaseToken = await FirebaseService.getToken();
-      print('🔍 Firebase token obtained: ${firebaseToken?.isNotEmpty}');
-      
-      // Create signup model with phone and Firebase token
-      final signupModel = SignUpUserModel(
-        phone: widget.phoneNumber,
-        firebaseToken: firebaseToken,
-      );
-      
-      // Call backend API
-      print('🔍 Calling backend API...');
-      final response = await _api.sendOtp(signupModel);
-      print('🔍 API response received - isSuccess: ${response.isSuccess}');
-      
-      if (response.isSuccess) {
-        print('🔍 Login successful, saving data...');
-        // The backend now requires a JWT on every call (same as the Android app). Without the
-        // token the user must not be treated as logged in.
-        if (response.jwtToken.isEmpty) {
-          if (mounted) {
-            setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Login failed: no session token received')),
-            );
-          }
-          return;
-        }
-        await TokenStore.saveTokens(response.jwtToken, response.refreshToken);
-
-        // Save login status
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_logged_in', true);
-        await prefs.setString('policies', response.policies);
-        await prefs.setString('terms', response.terms);
-        
-        // Save user data if available
-        if (response.user != null) {
-          final user = response.user!;
-          print('🔍 Saving user data: id=${user.id}, username=${user.username}, state=${user.state}');
-          if (user.id != null) {
-            await prefs.setString('user_id', user.id.toString());
-            print('🔍 User ID saved: ${user.id}');
-          }
-          if (user.username != null) {
-            await prefs.setString('username', user.username!);
-          }
-          // Sell-car posts need the owner's phone number and role.
-          await prefs.setString(
-              'phone_number', user.phone ?? widget.phoneNumber);
-          if (user.role != null) {
-            await prefs.setString('role', user.role!);
-          }
-          if (user.state != null) {
-            await prefs.setString('state', user.state!);
-          }
-          if (user.isPremium != null) {
-            await prefs.setBool('is_premium', user.isPremium!);
-          }
-        } else {
-          print('🔍 No user data in response');
-        }
-        
-        if (mounted) {
-          print('🔍 Widget is mounted, setting loading to false and navigating...');
-          setState(() => _isLoading = false);
-          
-          // Navigate to home screen
-          print('🔍 Navigating to SellCarHomeScreen...');
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) {
-              print('🔍 Creating SellCarHomeScreen...');
-              return const SellCarHomeScreen();
-            }),
-            (route) => false,
-          );
-          print('🔍 Navigation initiated');
-        } else {
-          print('🔍 Widget not mounted, skipping navigation');
-        }
-      } else {
-        print('🔍 Login failed: ${response.message}');
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response.message)),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: $e')),
-        );
-      }
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sendOtp(isResend: false));
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    _otpController.dispose();
+    _otpFocus.dispose();
     super.dispose();
+  }
+
+  // ── Sending ────────────────────────────────────────────────────────────────────────────────
+
+  void _sendOtp({required bool isResend}) {
+    setState(() => _loading = true);
+    showAppSnackBar(context, 'OTP is sending...', duration: const Duration(seconds: 30));
+    FirebaseAuthService.sendOtp(
+      phoneNumber: widget.phoneNumber,
+      isResend: isResend,
+      onCodeSent: _onCodeSent,
+      onFailed: _onSendFailed,
+      onAutoFill: (code) {
+        if (!mounted) return;
+        _otpController.text = _extractOtp(code);
+      },
+    );
+  }
+
+  void _onCodeSent() {
+    if (!mounted) return;
+    _sendCount++;
+    setState(() {
+      _codeSent = true;
+      _loading = false;
+      _canSendOtp = false;
+      _wrongAttempts = 0;
+      _attemptsExhausted = false;
+    });
+    showAppSnackBar(context, 'OTP sent');
+    _startTimer();
+    _otpFocus.requestFocus();
+  }
+
+  void _onSendFailed(FirebaseAuthException e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    setState(() {
+      _loading = false;
+      // Nothing is counting down, so let the user try again.
+      _canSendOtp = true;
+    });
+    if (e.code == 'too-many-requests') {
+      showAppSnackBar(context,
+          'You have exceed maximum number of request. Please come back later.');
+    } else if (e.code == 'invalid-phone-number') {
+      showMessageDialog(context,
+          'The mobile number you entered seems to be incorrect. Please check and try again.',
+          onOk: () => Navigator.of(context).pop());
+    } else {
+      showMessageDialog(
+          context, e.message ?? 'Something went wrong. Please try again later.');
+    }
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    setState(() {
+      _secondsLeft = _timerSeconds;
+      _isTimerRunning = true;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return timer.cancel();
+      if (_secondsLeft <= 1) {
+        timer.cancel();
+        setState(() {
+          _secondsLeft = 0;
+          _isTimerRunning = false;
+          _canSendOtp = true;
+        });
+      } else {
+        setState(() => _secondsLeft--);
+      }
+    });
+  }
+
+  void _onResendTap() {
+    if (_sendCount == 3) {
+      showMessageDialog(context,
+          'You have exceed maximum number of request. Please come back later.');
+      return;
+    }
+    if (!_canSendOtp) {
+      showAppSnackBar(context, 'Please wait for the timer to finish.');
+      return;
+    }
+    // A new code invalidates whatever was typed.
+    _otpController.clear();
+    _wrongAttempts = 0;
+    setState(() => _canSendOtp = false);
+    _sendOtp(isResend: true);
+  }
+
+  // ── Entering / verifying ────────────────────────────────────────────────────────────────────
+
+  /// Same rule as Android's extractOtp: first standalone 6-digit group, else the first 6 digits.
+  String _extractOtp(String text) {
+    final group = RegExp(r'\d{6}').firstMatch(text);
+    if (group != null) return group.group(0)!;
+    final digits = text.replaceAll(RegExp(r'\D'), '');
+    return digits.length > 6 ? digits.substring(0, 6) : digits;
+  }
+
+  void _onOtpChanged() {
+    setState(() {});
+    if (_otpController.text.length == 6) _submitOtp();
+  }
+
+  void _onVerifyTap() {
+    if (_loading) return;
+    final code = _otpController.text;
+    if (code.isEmpty) {
+      showAppSnackBar(context, 'Please enter OTP');
+    } else if (code.length < 6) {
+      showAppSnackBar(context, 'Please enter complete OTP');
+    } else {
+      _submitOtp();
+    }
+  }
+
+  Future<void> _submitOtp() async {
+    if (_attemptsExhausted || _isSubmitting || _verified || !_codeSent) return;
+    final code = _otpController.text;
+    if (code.length != 6) return;
+
+    _isSubmitting = true;
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuthService.verifyOtp(code);
+    } catch (_) {
+      _isSubmitting = false;
+      if (mounted) _onWrongOtp();
+      return;
+    }
+
+    _verified = true;
+    _isSubmitting = false;
+    _timer?.cancel();
+    _isTimerRunning = false;
+    await _loginWithBackend();
+  }
+
+  void _onWrongOtp() {
+    _wrongAttempts++;
+    _otpController.clear();
+    setState(() => _loading = false);
+
+    if (_wrongAttempts >= _maxWrongAttempts) {
+      setState(() => _attemptsExhausted = true);
+      showMessageDialog(
+        context,
+        'You have reached the maximum number of attempts. Please verify your number again.',
+        onOk: () {
+          if (mounted) Navigator.of(context).pop();
+        },
+      );
+      return;
+    }
+    final remaining = _maxWrongAttempts - _wrongAttempts;
+    showMessageDialog(context, 'Please enter the correct OTP. $remaining attempt(s) left.');
+  }
+
+  Future<void> _loginWithBackend() async {
+    try {
+      final response = await LoginSession.signUp(widget.phoneNumber);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final username = response.user?.username ?? '';
+      if (username.trim().isEmpty) {
+        // New user: ask for the name first (Android: FragmentUpdateName).
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ProfileDetailsScreen(
+              phoneNumber: widget.phoneNumber,
+              origin: widget.origin,
+            ),
+          ),
+        );
+      } else {
+        LoginSession.finish(context, widget.origin);
+      }
+    } on LoginFailedException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _verified = false;
+      showMessageDialog(context, e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _verified = false;
+      showMessageDialog(context, 'Something went wrong!');
+    }
+  }
+
+  // ── Navigation ──────────────────────────────────────────────────────────────────────────────
+
+  void _onCloseTap() {
+    if (_isTimerRunning) {
+      showAppSnackBar(context, 'Please wait for the timer to finish.');
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _onEditTap() async {
+    final yes = await showConfirmDialog(context, 'Do you want to edit your phone number?');
+    if (yes && mounted) {
+      _timer?.cancel();
+      Navigator.of(context).pop();
+    }
+  }
+
+  // ── UI ──────────────────────────────────────────────────────────────────────────────────────
+
+  String get _timerText {
+    final minutes = _secondsLeft ~/ 60;
+    final seconds = _secondsLeft % 60;
+    return '$minutes min, $seconds sec Enter the OTP.';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/registration_page_background.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+    return PopScope(
+      canPop: !_isTimerRunning,
+      onPopInvoked: (didPop) {
+        if (!didPop) showAppSnackBar(context, 'Please wait for the timer to finish.');
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔙 Back button
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                ),
-
-                const SizedBox(height: 24),
-
-                const Text(
-                  "OTP Verification",
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                Text(
-                  "Enter the OTP sent to ${widget.phoneNumber}",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // 🔢 OTP boxes
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (index) {
-                    return SizedBox(
-                      width: 48,
-                      height: 56,
-                      child: TextField(
-                        controller: _controllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 1,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: InputDecoration(
-                          counterText: "",
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Colors.white),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Colors.white),
-                          ),
-                        ),
-                        onChanged: (value) => _onOtpChanged(index, value),
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.close, color: Color(0xFF9CA3AF)),
+                        onPressed: _onCloseTap,
                       ),
-                    );
-                  }),
+                    ),
+                  ),
                 ),
-
-                const SizedBox(height: 20),
-
-                // 🔁 Resend
-                Center(
-                  child: _secondsRemaining > 0
-                      ? Text(
-                          "Didn't receive OTP? Resend in ${_secondsRemaining}s",
-                          style: const TextStyle(color: Colors.white70),
-                        )
-                      : TextButton(
-                          onPressed: () {
-                            _startTimer();
-                            // call resend OTP API later
-                          },
-                          child: const Text(
-                            "Resend OTP",
-                            style: TextStyle(color: Colors.white),
+                const SizedBox(height: 16),
+                const Text(
+                  'Verify Mobile Number',
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 28,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                const Text(
+                  'OTP sent to your mobile number.',
+                  style: TextStyle(
+                      fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF374151)),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      _displayNumber,
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: _onEditTap,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Text(
+                          'Edit',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: AppColors.accent,
                           ),
                         ),
+                      ),
+                    ),
+                  ],
                 ),
-
                 const SizedBox(height: 32),
-                
-                                // ✅ Verify button
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          (_isOtpComplete && !_isLoading) ? Colors.white : Colors.white54,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                                                                                                            onPressed: (_isOtpComplete && !_isLoading)
-                                                                                                                                ? () async {
-                                                                                                                                    print('🔍 OTP Verify button pressed');
-                                                                                                                                    setState(() => _isLoading = true);
-                                                                                                                                    
-                                                                                                                                    try {
-                                                                                                                                      // Check for hardcoded test OTP first
-                                                                                                                                      // Debug-only shortcut. In release it would let anyone obtain a
-                                                                                                                                      // real session token for any phone number.
-                                                                                                                                      if (kDebugMode && _otp == "123123") {
-                                                                                                                                        print('🔍 Using hardcoded test OTP - bypassing Firebase verification');
-                                                                                                                                        await _callLoginAPI();
-                                                                                                                                        return;
-                                                                                                                                      }
-                                                                                                                                      
-                                                                                                                                      print('🔍 Starting OTP verification with Firebase');
-                                                                                                                                      // Step 1: Verify OTP with Firebase
-                                                                                                                                      final user = await FirebaseAuthService.verifyOTP(
-                                                                                                                                        otpCode: _otp,
-                                                                                                                                        onError: (error) {
-                                                                                                                                          print('🔍 Firebase OTP verification failed: $error');
-                                                                                                                                          if (mounted) {
-                                                                                                                                            setState(() => _isLoading = false);
-                                                                                                                                            ScaffoldMessenger.of(context).showSnackBar(
-                                                                                                                                              SnackBar(content: Text(error)),
-                                                                                                                                            );
-                                                                                                                                          }
-                                                                                                                                        },
-                                                                                                                                      );
-                                                                                                                                      
-                                                                                                                                      print('🔍 Firebase OTP verification completed');
-                                                                                                                                      
-                                                                                                                                      // Step 2: Call backend login API 
-                                                                                                                                      // (proceed even if user is null in test mode)
-                                                                                                                                      print('🔍 Calling backend login API');
-                                                                                                                                      await _callLoginAPI();
-                                                                                                                                      
-                                                                                                                                    } catch (e) {
-                                                                                                                                      print('🔍 Exception in OTP verification: $e');
-                                                                                                                                      if (mounted) {
-                                                                                                                                        setState(() => _isLoading = false);
-                                                                                                                                        ScaffoldMessenger.of(context).showSnackBar(
-                                                                                                                                          SnackBar(content: Text('Verification failed: $e')),
-                                                                                                                                        );
-                                                                                                                                      }
-                                                                                                                                    }
-                                                                                                                                  }                                                            : null,
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Color(0xFF6A4C93),
-                                            ),
-                                          )
-                                        : const Text(
-                                            "Verify",
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF6A4C93),
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ],            ),
+                _buildOtpBoxes(),
+                const SizedBox(height: 16),
+                _buildTimerOrResend(),
+                const SizedBox(height: 32),
+                AppButton(text: 'Verify', loading: _loading, onPressed: _onVerifyTap),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  /// Six boxes drawn over one hidden text field. A single field handles typing, backspace,
+  /// paste, and iOS's "From Messages" one-time-code suggestion.
+  Widget _buildOtpBoxes() {
+    final enabled = _codeSent && !_attemptsExhausted && !_verified;
+    final text = _otpController.text;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? () => _otpFocus.requestFocus() : null,
+      child: Stack(
+        children: [
+          Row(
+            children: List.generate(6, (i) {
+              final filled = i < text.length;
+              final focused = enabled && _otpFocus.hasFocus && i == text.length;
+              return Expanded(
+                child: Container(
+                  height: 64,
+                  margin: EdgeInsets.only(right: i < 5 ? 8 : 0),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: focused ? Border.all(color: AppColors.accent, width: 1.5) : null,
+                  ),
+                  child: Text(
+                    filled ? '*' : '',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: enabled ? Colors.black : Colors.black38,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          // Invisible input that owns the keyboard.
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0,
+              child: TextField(
+                controller: _otpController,
+                focusNode: _otpFocus,
+                enabled: enabled,
+                keyboardType: TextInputType.number,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                showCursor: false,
+                enableInteractiveSelection: false,
+                inputFormatters: [_OtpPasteFormatter(_extractOtp)],
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  counterText: '',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimerOrResend() {
+    if (_isTimerRunning) {
+      return Text(
+        _timerText,
+        style: const TextStyle(
+            fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF4B5563)),
+      );
+    }
+    if (!_canSendOtp) return const SizedBox(height: 18);
+    return GestureDetector(
+      onTap: _onResendTap,
+      child: const Text(
+        "Didn't receive OTP? Resend",
+        style: TextStyle(
+          fontFamily: 'Outfit',
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          color: AppColors.accent,
+          decoration: TextDecoration.underline,
+          decorationColor: AppColors.accent,
+        ),
+      ),
+    );
+  }
+}
+
+/// Keeps only digits (max 6). A paste of a whole SMS ("Your code is 123456") becomes "123456".
+class _OtpPasteFormatter extends TextInputFormatter {
+  final String Function(String) extract;
+
+  _OtpPasteFormatter(this.extract);
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final added = newValue.text.length - oldValue.text.length;
+    final String next;
+    if (added > 1) {
+      next = extract(newValue.text);
+    } else {
+      final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+      next = digits.length > 6 ? digits.substring(0, 6) : digits;
+    }
+    return TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
     );
   }
 }

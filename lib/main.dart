@@ -1,27 +1,25 @@
-
 import 'package:carsbuzz/auth/auth_wrapper.dart';
 import 'package:carsbuzz/network/firebase_service.dart';
 import 'package:carsbuzz/network/session_events.dart';
+import 'package:carsbuzz/theme/app_colors.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // 🔥 Try to initialize Firebase
-    await Firebase.initializeApp(demoProjectId: 'carsbuzz-a724f');
+    // Uses the real project config from google-services.json / GoogleService-Info.plist.
+    // (The old `demoProjectId` argument created a fake emulator-only app, so phone login and
+    // push notifications could never work against the real Firebase project.)
+    await Firebase.initializeApp();
     await FirebaseService.init();
-    debugPrint('🔥 Firebase initialized successfully');
   } catch (e) {
-    // If Firebase initialization fails, continue without it
-    debugPrint('🔥 Firebase initialization failed: $e');
-    debugPrint('🔥 Continuing in test mode...');
+    debugPrint('Firebase initialization failed: $e');
   }
 
-  // When the refresh token is refused the stored session has already been cleared; send the user
-  // back to login (AuthWrapper shows LoginScreen because is_logged_in is now false).
+  // When the refresh token is refused the stored session has already been cleared; restart at
+  // the home screen as a guest (same as Android, which drops back to the logged-out state).
   SessionEvents.onSessionExpired = () {
     final navigator = SessionEvents.navigatorKey.currentState;
     if (navigator == null) return;
@@ -41,39 +39,19 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: SessionEvents.navigatorKey,
+      title: 'Garragge',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Apply Roboto font to the entire app
-        textTheme: GoogleFonts.robotoTextTheme(
-          Theme.of(context).textTheme,
+        // Outfit is the Android app's font (res/font/outfit_*.ttf).
+        fontFamily: 'Outfit',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.accent,
+          primary: AppColors.accent,
         ),
-        // Apply Roboto to AppBar text
-        appBarTheme: AppBarTheme(
-          titleTextStyle: GoogleFonts.roboto(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        // Apply Roboto to ElevatedButton text
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            textStyle: GoogleFonts.roboto(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        // Apply Roboto to TextButton text
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            textStyle: GoogleFonts.roboto(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+        scaffoldBackgroundColor: Colors.white,
+        useMaterial3: true,
       ),
-      home: const AuthWrapper(), // ✅ Now checks auth status first
+      home: const AuthWrapper(),
     );
   }
 }

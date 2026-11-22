@@ -1,156 +1,89 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
+/// Firebase phone-number verification, mirroring the Android app's firebasemobileauth/PhoneAuth.kt.
+///
+/// - The number is always sent in E.164 form (+91XXXXXXXXXX).
+/// - The ForceResendingToken from every `codeSent` is cached, and passed back on resend so Firebase
+///   issues a NEW code instead of re-delivering the old one.
+/// - Auto-retrieval timeout is 0 (same as Android); the user types the code, or iOS offers it from
+///   the SMS through the keyboard's one-time-code suggestion.
+/// - The same real flow runs on Android and iOS (the old iOS "test OTP 123123" shortcut is gone).
 class FirebaseAuthService {
+  FirebaseAuthService._();
+
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static String? _verificationId;
-  static bool _testMode = false;
-  
-  /// Check if running on iOS (for test mode)
-  static bool get _isIOS => Platform.isIOS;
-  
-  /// Send OTP to phone number (Test mode for iOS, Real for Android)
-  static Future<void> sendOTP({
+  static int? _resendToken;
+
+  /// Canonical E.164 number for a 10-digit Indian mobile number (or any input containing one).
+  static String e164(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    final last10 = digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
+    return '+91$last10';
+  }
+
+  /// Sends (or, with [isResend], re-sends) the OTP.
+  static Future<void> sendOtp({
     required String phoneNumber,
+    bool isResend = false,
     required VoidCallback onCodeSent,
-    required Function(String error) onError,
-    int? resendToken,
+    required void Function(FirebaseAuthException e) onFailed,
+    void Function(String smsCode)? onAutoFill,
   }) async {
     try {
-      // Use test mode for iOS development (no Apple Developer account needed)
-      if (_isIOS) {
-        debugPrint('🔥 iOS Development Mode - Using test OTP: 123123');
-        _testMode = true;
-        _simulateOTPSent(onCodeSent);
-        return;
-      }
-      
-      // Real Firebase OTP for Android (and iOS when Apple account is ready)
-      String formattedPhone = phoneNumber;
-      if (!formattedPhone.startsWith('+')) {
-        formattedPhone = '+91$phoneNumber';
-      }
-      
-      debugPrint('🔥 Sending real OTP to: $formattedPhone');
-      
       await _auth.verifyPhoneNumber(
-        phoneNumber: formattedPhone,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          debugPrint('🔥 Auto verification completed');
+        phoneNumber: e164(phoneNumber),
+        timeout: Duration.zero,
+        forceResendingToken: isResend ? _resendToken : null,
+        verificationCompleted: (PhoneAuthCredential credential) {
+          // Android instant verification: fill the boxes with the code; the screen submits it.
+          final code = credential.smsCode;
+          if (code != null && code.isNotEmpty) onAutoFill?.call(code);
         },
         verificationFailed: (FirebaseAuthException e) {
-          debugPrint('🔥 Verification failed: ${e.code} - ${e.message}');
-          String errorMessage = _getReadableError(e.code);
-          onError(errorMessage);
+          debugPrint('Phone verification failed: ${e.code} ${e.message}');
+          onFailed(e);
         },
         codeSent: (String verificationId, int? resendToken) {
-          debugPrint('🔥 Real OTP code sent to $formattedPhone');
           _verificationId = verificationId;
+          _resendToken = resendToken;
           onCodeSent();
         },
+        // Not an error: with auto-retrieval disabled this fires right after the code is sent.
         codeAutoRetrievalTimeout: (String verificationId) {
-          _verificationId = verificationId;
+          _verificationId ??= verificationId;
         },
-        timeout: const Duration(seconds: 60),
-        forceResendingToken: resendToken,
       );
-    } catch (e) {
-      debugPrint('🔥 Send OTP Error: $e');
-      onError('Failed to send OTP. Please try again.');
-    }
-  }
-  
-  /// Simulate OTP sent for iOS test mode
-  static void _simulateOTPSent(VoidCallback onCodeSent) {
-    Future.delayed(const Duration(seconds: 1), () {
-      debugPrint('🔥 TEST OTP SENT - Use: 123123');
-      _verificationId = 'test_verification_id';
-      onCodeSent();
-    });
-  }
-  
-  /// Verify real OTP code from SMS
-  static Future<User?> verifyOTP({
-    required String otpCode,
-    required Function(String error) onError,
-  }) async {
-    try {
-      if (_verificationId == null) {
-        onError('Verification session expired. Please resend OTP.');
-        return null;
-      }
-      
-      debugPrint('🔥 Verifying real OTP: $otpCode');
-      
-      // iOS Test Mode - Accept test OTP 123123
-      if (_testMode && _isIOS) {
-        debugPrint("🔥 iOS Test Mode - Verifying OTP: $otpCode");
-        if (otpCode.length != 6) {
-          onError("Please enter a valid 6-digit OTP code");
-          return null;
-        }
-        if (!RegExp(r"^\d{6}$").hasMatch(otpCode)) {
-          onError("OTP should contain only numbers");
-          return null;
-        }
-        if (otpCode == "123123") {
-          debugPrint("🔥 iOS Test OTP (123123) Verified Successfully");
-          return null;
-        } else {
-          onError("Invalid test OTP. Use: 123123 for iOS development");
-          return null;
-        }
-      }
-      
-      // Real Firebase OTP verification for Android
-      
-      if (otpCode.length != 6) {
-        onError('Please enter a valid 6-digit OTP code');
-        return null;
-      }
-      
-      if (!RegExp(r'^\d{6}$').hasMatch(otpCode)) {
-        onError('OTP should contain only numbers');
-        return null;
-      }
-      
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otpCode,
-      );
-      
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
-      debugPrint('🔥 Real OTP Verified Successfully');
-      return userCredential.user;
-      
     } on FirebaseAuthException catch (e) {
-      debugPrint('🔥 OTP Verification Error: ${e.code} - ${e.message}');
-      String errorMessage = _getReadableError(e.code);
-      onError(errorMessage);
-      return null;
+      onFailed(e);
     } catch (e) {
-      debugPrint('🔥 OTP Verification Error: $e');
-      onError('Failed to verify OTP. Please try again.');
-      return null;
+      onFailed(FirebaseAuthException(code: 'unknown', message: e.toString()));
     }
   }
-  
-  static User? getCurrentUser() => _auth.currentUser;
-  static Future<void> signOut() async => await _auth.signOut();
-  
-  static String _getReadableError(String code) {
-    switch (code) {
-      case 'invalid-phone-number':
-        return 'Invalid phone number format';
-      case 'too-many-requests':
-        return 'Too many requests. Please try again later';
-      case 'invalid-verification-code':
-        return 'Invalid OTP code. Please check and try again';
-      case 'invalid-verification-id':
-        return 'Verification session expired. Please resend OTP';
-      default:
-        return 'Authentication failed. Please try again';
+
+  /// Signs in with the typed code. Throws [FirebaseAuthException] if the code is wrong or the
+  /// verification session is gone.
+  static Future<void> verifyOtp(String code) async {
+    final verificationId = _verificationId;
+    if (verificationId == null) {
+      throw FirebaseAuthException(
+        code: 'session-expired',
+        message: 'Verification session expired. Please resend the OTP.',
+      );
     }
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: code,
+    );
+    await _auth.signInWithCredential(credential);
+  }
+
+  static User? getCurrentUser() => _auth.currentUser;
+
+  static Future<void> signOut() async {
+    _verificationId = null;
+    _resendToken = null;
+    await _auth.signOut();
   }
 }

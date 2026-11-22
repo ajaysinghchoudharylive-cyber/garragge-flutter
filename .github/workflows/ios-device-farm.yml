@@ -47,6 +47,10 @@ jobs:
       - name: Get packages
         run: flutter pub get
 
+      # Regenerate the launcher icons from assets/images/logo.png (the Android app's logo).
+      - name: Generate app icons
+        run: dart run flutter_launcher_icons
+
       # Unsigned device build. Device Farm re-signs the app with its own wildcard provisioning
       # profile, so no Apple certificate is needed just to test on Device Farm.
       - name: Build iOS app (no code signing)

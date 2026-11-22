@@ -14,12 +14,21 @@ class CarListingScreen extends StatefulWidget {
   final String? initialBrand;
   final String? initialModel;
   final bool isFromPopular;
+  // Filters chosen on the dashboard's "Find The Cars Of Your Choice" card.
+  final String? initialFuelType;
+  final String? initialTransmission;
+  final String? initialMinPrice; // rupees, e.g. "500000"
+  final String? initialMaxPrice;
 
   const CarListingScreen({
     super.key,
     this.initialBrand,
     this.initialModel,
     this.isFromPopular = false,
+    this.initialFuelType,
+    this.initialTransmission,
+    this.initialMinPrice,
+    this.initialMaxPrice,
   });
 
   @override
@@ -55,6 +64,11 @@ class _CarListingScreenState extends State<CarListingScreen> {
   void initState() {
     super.initState();
     _selectedBrand = widget.initialBrand;
+    _selectedFuelType = widget.initialFuelType;
+    _selectedTransmission = widget.initialTransmission;
+    _minPrice = widget.initialMinPrice;
+    _maxPrice = widget.initialMaxPrice;
+    _updateActiveFilters();
     _scrollController.addListener(_onScroll);
     _loadPreferences();
   }
@@ -305,6 +319,14 @@ class _CarListingScreenState extends State<CarListingScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
+          // Back arrow when opened from the dashboard (not as the Buy tab).
+          if (Navigator.of(context).canPop())
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36),
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           // Location
           GestureDetector(
             onTap: () {
