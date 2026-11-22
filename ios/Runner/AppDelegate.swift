@@ -35,22 +35,6 @@ import GoogleMaps
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
-  
-  // Handle APNs token for Firebase Auth
-  override func application(_ application: UIApplication, 
-                           didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-    Auth.auth().setAPNSToken(deviceToken, type: AuthAPNSTokenType.unknown)
-  }
-  
-  // Handle APNs notification for Firebase Auth
-  override func application(_ application: UIApplication,
-                           didReceiveRemoteNotification userInfo: [AnyHashable: Any],
-                           fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-    if Auth.auth().canHandleNotification(userInfo) {
-      completionHandler(.noData)
-      return
-    }
-    // Handle other remote notifications
-    completionHandler(.newData)
-  }
+  // APNs token and silent-push handling for Firebase Auth is done by the
+  // firebase_auth / firebase_messaging plugins via method swizzling.
 }
