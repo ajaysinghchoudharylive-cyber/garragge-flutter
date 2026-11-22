@@ -11,8 +11,12 @@ class SellCarFormData {
   String? variantName;
   int? variantId;
 
-  /// Colours offered for the chosen model/variant (drives the colour step).
-  List<String> availableColors = [];
+  /// Colours offered for the chosen model (drives the colour step).
+  List<ModelColor> availableColors = [];
+
+  /// Started from the brand screen's "Upload RC & Continue" shortcut: the seller skipped picking
+  /// the car and only sends photos + RC; an admin fills in the details (Android isNeedsRc).
+  bool rcShortcut = false;
 
   // "Other" picks: the exact option wasn't listed. The typed value goes in the normal field
   // (modelName / variantName / color) and the matching flag below marks it for admin review.
@@ -70,7 +74,7 @@ class SellCarFormData {
   SellCarFormData();
 
   /// True when the ad needs an RC photo (seller picked "Other" for model, variant or colour).
-  bool get requiresRc => otherModel || otherVariant || otherColor;
+  bool get requiresRc => rcShortcut || otherModel || otherVariant || otherColor;
 
   bool get hasBrandAndModel =>
       brandName != null &&
@@ -78,7 +82,10 @@ class SellCarFormData {
       modelName != null &&
       modelName!.isNotEmpty;
 
+  /// Same as Android: an RC-based ad ("Other" pick or the RC shortcut) skips the detail steps,
+  /// so only the full manual flow needs every field.
   bool get isReadyToPost =>
+      requiresRc ||
       hasBrandAndModel &&
       registrationYear != null &&
       carPrice != null &&
@@ -184,6 +191,7 @@ class SellCarFormData {
     variantName = null;
     variantId = null;
     availableColors = [];
+    rcShortcut = false;
     otherModel = false;
     otherVariant = false;
     otherColor = false;

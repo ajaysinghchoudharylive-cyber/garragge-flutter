@@ -292,7 +292,7 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_isTimerRunning,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop) showAppSnackBar(context, 'Please wait for the timer to finish.');
       },
       child: Scaffold(

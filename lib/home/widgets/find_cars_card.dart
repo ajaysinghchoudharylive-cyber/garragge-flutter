@@ -579,7 +579,7 @@ class _OutlinedThumb extends RangeSliderThumbShape {
   }) {
     final canvas = context.canvas;
     canvas.drawCircle(center + const Offset(0, 1), 10,
-        Paint()..color = Colors.black.withOpacity(0.12));
+        Paint()..color = Colors.black.withValues(alpha: 0.12));
     canvas.drawCircle(center, 10, Paint()..color = Colors.white);
     canvas.drawCircle(
       center,

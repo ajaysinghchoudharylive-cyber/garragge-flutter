@@ -28,7 +28,7 @@ class AppButton extends StatelessWidget {
         onPressed: loading ? () {} : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
-          disabledBackgroundColor: color.withOpacity(0.5),
+          disabledBackgroundColor: color.withValues(alpha: 0.5),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -82,7 +82,7 @@ class _ThreeDotLoaderState extends State<ThreeDotLoader>
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: widget.color.withOpacity(active ? 1 : 0.4),
+                color: widget.color.withValues(alpha: active ? 1 : 0.4),
                 shape: BoxShape.circle,
               ),
             );

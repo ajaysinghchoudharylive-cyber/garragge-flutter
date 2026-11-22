@@ -178,7 +178,7 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
+            color: isSelected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(

@@ -256,7 +256,7 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                   width: 10,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -340,7 +340,7 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -377,7 +377,7 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                   width: 20,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
@@ -407,11 +407,11 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: Colors.white.withValues(alpha: 0.95),
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 ),
@@ -467,9 +467,9 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withOpacity(0.95),
-                    Colors.white.withOpacity(0.9),
-                    Colors.white.withOpacity(0.0),
+                    Colors.white.withValues(alpha: 0.95),
+                    Colors.white.withValues(alpha: 0.9),
+                    Colors.white.withValues(alpha: 0.0),
                   ],
                 ),
               ),
@@ -501,7 +501,7 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                             boxShadow: [
                               BoxShadow(
                                 blurRadius: 6,
-                                color: Colors.black.withOpacity(0.15),
+                                color: Colors.black.withValues(alpha: 0.15),
                               )
                             ],
                           ),
@@ -536,12 +536,12 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
+                      color: Colors.white.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
                           blurRadius: 10,
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                         )
                       ],
                     ),
@@ -575,7 +575,7 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                   boxShadow: [
                     BoxShadow(
                       blurRadius: 8,
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                     )
                   ],
                 ),
@@ -673,7 +673,7 @@ class _ConfirmMapPinScreenState extends State<ConfirmMapPinScreen> {
                           boxShadow: [
                             BoxShadow(
                               blurRadius: 10,
-                              color: Colors.black.withOpacity(0.15),
+                              color: Colors.black.withValues(alpha: 0.15),
                               offset: const Offset(0, 3),
                             )
                           ],
@@ -720,7 +720,7 @@ class SimpleMapPainter extends CustomPainter {
 
     // Simple grid pattern
     final gridPaint = Paint()
-      ..color = Colors.grey.shade300.withOpacity(0.5)
+      ..color = Colors.grey.shade300.withValues(alpha: 0.5)
       ..strokeWidth = 1.0;
 
     // Draw simple grid

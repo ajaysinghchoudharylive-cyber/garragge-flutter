@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Backend sentinel id for the synthetic "Other" model / variant option. Picking it means the exact
 /// option isn't listed: the seller types the value and uploads an RC (registration certificate)
 /// photo so an admin can resolve it. Mirrors Android Constants.OTHER_OPTION_ID.
@@ -69,6 +71,46 @@ int? bodyCodeForLabel(String? label) {
   return null;
 }
 
+/// One colour of a model. The backend `available_colors` field is a JSON list of
+/// `{code, name, code2?}` (Android ModelColor); `code2` is the second tone of a dual-tone colour.
+class ModelColor {
+  final String name;
+  final String? code;
+  final String? code2;
+
+  const ModelColor({required this.name, this.code, this.code2});
+
+  bool get isDualTone => (code2 ?? '').trim().isNotEmpty;
+
+  /// Parses the JSON list; falls back to a comma-separated list of names (no swatch colour).
+  static List<ModelColor> parse(String? raw) {
+    final text = (raw ?? '').trim();
+    if (text.isEmpty || text == 'null') return [];
+    if (text.startsWith('[')) {
+      try {
+        final list = jsonDecode(text);
+        if (list is List) {
+          return list
+              .whereType<Map>()
+              .map((m) => ModelColor(
+                    name: (m['name'] ?? '').toString().trim(),
+                    code: m['code']?.toString(),
+                    code2: m['code2']?.toString(),
+                  ))
+              .where((c) => c.name.isNotEmpty)
+              .toList();
+        }
+      } catch (_) {}
+    }
+    return text
+        .split(',')
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .map((c) => ModelColor(name: c))
+        .toList();
+  }
+}
+
 /// A model of a brand: GET cars/{brandName}/models.
 class CarModelItem {
   final int id;
@@ -91,11 +133,7 @@ class CarModelItem {
 
   bool get isOther => id == kOtherOptionId;
 
-  List<String> get colorList => (availableColors ?? '')
-      .split(',')
-      .map((c) => c.trim())
-      .where((c) => c.isNotEmpty)
-      .toList();
+  List<ModelColor> get colors => ModelColor.parse(availableColors);
 
   factory CarModelItem.fromJson(Map<String, dynamic> json) {
     return CarModelItem(

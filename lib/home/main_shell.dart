@@ -1,13 +1,10 @@
 import 'package:carsbuzz/carlisting/car_listing_screen.dart';
 import 'package:carsbuzz/home/dashboard_screen.dart';
-import 'package:carsbuzz/login/login_screen.dart';
-import 'package:carsbuzz/login/login_session.dart';
 import 'package:carsbuzz/more/more_screen.dart';
 import 'package:carsbuzz/sellcar/sell_car_wizard_screen.dart';
 import 'package:carsbuzz/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Bottom-navigation shell, a port of the Android HomeActivity + bottom_nav_menu.xml:
 /// Dashboard, Buy, Sell, More.
@@ -33,9 +30,8 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  late int _index = widget.initialTab == MainShell.tabSell
-      ? MainShell.tabDashboard
-      : widget.initialTab;
+  // After a login started from Sell, come back to the Sell tab (Android LOGIN_ORIGIN).
+  late int _index = widget.openSellOnStart ? MainShell.tabSell : widget.initialTab;
 
   // Tabs are built the first time they are opened and then kept alive.
   final Set<int> _built = {};
@@ -44,28 +40,11 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _built.add(_index);
-    if (widget.openSellOnStart) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openSell());
-    }
-  }
-
-  Future<void> _openSell() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    final loggedIn = prefs.getBool('is_logged_in') ?? false;
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => loggedIn
-          ? const SellCarWizardScreen()
-          : const LoginScreen(origin: LoginOrigin.sell),
-    ));
   }
 
   void _onTap(int i) {
-    if (i == MainShell.tabSell) {
-      // Selling needs an account; the flow opens full screen like Android's sell wizard.
-      _openSell();
-      return;
-    }
+    // Like Android, the Sell tab shows the brand screen with the bottom bar; login is asked for
+    // when the seller picks a brand or uploads an RC.
     setState(() {
       _index = i;
       _built.add(i);
@@ -87,6 +66,8 @@ class _MainShellState extends State<MainShell> {
         return const DashboardScreen();
       case MainShell.tabBuy:
         return const CarListingScreen();
+      case MainShell.tabSell:
+        return SellCarWizardScreen(onBack: () => _onTap(MainShell.tabDashboard));
       case MainShell.tabMore:
         return MoreScreen(onLoggedOut: _onLoggedOut);
       default:
