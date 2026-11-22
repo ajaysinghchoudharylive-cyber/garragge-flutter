@@ -1,3 +1,5 @@
+import 'package:carsbuzz/sellcar/models/sell_car_models.dart';
+
 /// Equivalent to native SelectDetailsPojoJava.java
 /// Collects all sell car form data across the wizard steps.
 /// This is the single source of truth for the entire sell car flow.
@@ -5,18 +7,31 @@ class SellCarFormData {
   // Brand & Model
   String? brandName;
   String? modelName;
+  int? modelId;
   String? variantName;
   int? variantId;
 
+  /// Colours offered for the chosen model/variant (drives the colour step).
+  List<String> availableColors = [];
+
+  // "Other" picks: the exact option wasn't listed. The typed value goes in the normal field
+  // (modelName / variantName / color) and the matching flag below marks it for admin review.
+  bool otherModel = false;
+  bool otherVariant = false;
+  bool otherColor = false;
+
+  /// RC (registration certificate) photo, required when any "Other" option was picked.
+  String? rcImagePath;
+
   // Car Details
   int? registrationYear;
-  String? owner; // "1st owner", "2nd owner", etc.
+  String? owner; // "First owner", "Second owner", ...
   String? carPrice;
   String? kmDriven;
-  String? transmission; // "Manual" or "Automatic"
+  String? transmission; // "Manual", "Automatic", "Semi - Automatic"
   String? fuelType; // "Petrol", "Diesel", "CNG", "Electric", "Hybrid", "LPG"
   String? ownersType; // "Individual" or "Dealer"
-  String? carModified; // "Yes" or "No"
+  String? carModified; // "yes" or "no"
   int? bodyType;
   String? color;
   String? seatingCapacity;
@@ -27,16 +42,21 @@ class SellCarFormData {
   String? phoneNumber;
   String? ownerName;
 
+  /// Coordinates of the car. The backend derives city/state from these.
+  double? latitude;
+  double? longitude;
+  String? fullAddress;
+
   // Vehicle Condition Checklist (Additional Info)
-  String? insurance; // "Comprehensive", "Third Party", "Expired"
-  String? registration; // "HP", "DL", etc.
-  String? battery; // "Good", "Average", "Poor"
-  String? tyre; // "Good", "Average", "Poor"
-  String? brakes; // "Good", "Average", "Poor"
-  String? service; // "Regular", "Irregular"
-  String? loan; // "Yes", "No"
-  String? puc; // "Valid", "Expired"
-  String? challan; // "Yes", "No"
+  String? insurance;
+  String? registration;
+  String? battery;
+  String? tyre;
+  String? brakes;
+  String? service;
+  String? loan;
+  String? puc;
+  String? challan;
 
   // Images & Videos
   List<String> imagePaths = [];
@@ -49,14 +69,15 @@ class SellCarFormData {
 
   SellCarFormData();
 
-  /// Check if brand + model are selected (minimum to show wizard)
+  /// True when the ad needs an RC photo (seller picked "Other" for model, variant or colour).
+  bool get requiresRc => otherModel || otherVariant || otherColor;
+
   bool get hasBrandAndModel =>
       brandName != null &&
       brandName!.isNotEmpty &&
       modelName != null &&
       modelName!.isNotEmpty;
 
-  /// Check if all required fields for posting are filled
   bool get isReadyToPost =>
       hasBrandAndModel &&
       registrationYear != null &&
@@ -68,10 +89,9 @@ class SellCarFormData {
       transmission != null &&
       owner != null;
 
-  /// Check if minimum images are uploaded (native requires 6)
+  /// Native requires at least 6 photos.
   bool get hasMinimumImages => imagePaths.length >= 6;
 
-  /// Get summary chips for display in the wizard
   List<String> get summaryChips {
     final chips = <String>[];
     if (brandName != null) chips.add(brandName!);
@@ -87,30 +107,33 @@ class SellCarFormData {
     return chips;
   }
 
-  /// Convert to JSON map for API request (matches native CarsListingModels.kt)
+  /// The `carDetails` JSON part of POST cars/postad. Keys match the Android CarsListingModels.
+  /// City/state are intentionally blank: the server derives both from latitude/longitude.
   Map<String, dynamic> toPostAdJson() {
     return {
       'make': brandName ?? '',
       'cars_model': modelName ?? '',
-      'variantId': variantId,
-      'cars_registration_year': registrationYear ?? 0,
       'cars_km_driven': kmDriven ?? '',
-      'car_price': carPrice ?? '',
-      'cars_fuel_type': fuelType ?? '',
       'cars_transmission': transmission ?? '',
+      'car_price': carPrice ?? '',
       'cars_owners': owner ?? '',
+      'cars_fuel_type': fuelType ?? '',
+      'cars_city': '',
       'cars_owner_type': ownersType ?? 'Individual',
-      'cars_city': city ?? '',
-      'cars_state': state ?? '',
+      'user_id': userId ?? 0,
+      'cars_registration_year': registrationYear ?? 0,
+      'car_modified': carModified ?? 'no',
       'body': bodyType ?? 0,
-      'car_modified': carModified ?? 'No',
       'phone_number': phoneNumber ?? '',
       'owner_name': ownerName ?? '',
-      'color': color ?? '',
-      'seating_capacity': seatingCapacity ?? '',
-      'user_id': userId ?? 0,
       'is_verified': 0,
+      'cars_state': '',
       'isCarPopular': 0,
+      'variantId': (variantId == null || variantId == 0 || variantId == kOtherOptionId)
+          ? null
+          : variantId,
+      'seating_capacity': seatingCapacity ?? '5',
+      'color': color ?? '',
       'insurance': insurance ?? '',
       'registration': registration ?? '',
       'battery': battery ?? '',
@@ -120,83 +143,51 @@ class SellCarFormData {
       'loan': loan ?? '',
       'puc': puc ?? '',
       'challan': challan ?? '',
+      'latitude': latitude ?? 0.0,
+      'longitude': longitude ?? 0.0,
+      'fullAddress': fullAddress ?? '',
+      'other_model': otherModel ? kOtherOptionLabel : null,
+      'other_variant': otherVariant ? kOtherOptionLabel : null,
+      'other_color': otherColor ? kOtherOptionLabel : null,
     };
   }
 
-  /// Convert to JSON for draft saving
-  Map<String, dynamic> toDraftJson() {
+  /// Body of POST/PUT cars/drafts (a flat string map, same keys as the server's RemoteCarDraft).
+  Map<String, String?> toDraftFields() {
     return {
       'make': brandName,
       'model': modelName,
-      'variantName': variantName,
-      'variantId': variantId,
       'fuelType': fuelType,
       'transmission': transmission,
       'color': color,
-      'registrationYear': registrationYear,
+      'registrationYear': registrationYear?.toString(),
       'owner': owner,
       'carPrice': carPrice,
       'kmDriven': kmDriven,
       'ownersType': ownersType,
       'carModified': carModified,
-      'bodyType': bodyType,
+      'bodyType': bodyType?.toString(),
       'city': city,
-      'state': state,
       'phoneNumber': phoneNumber,
       'ownerName': ownerName,
       'seatingCapacity': seatingCapacity,
-      'insurance': insurance,
-      'registration': registration,
-      'battery': battery,
-      'tyre': tyre,
-      'brakes': brakes,
-      'service': service,
-      'loan': loan,
-      'puc': puc,
-      'challan': challan,
+      'variantId': (variantId == null || variantId == kOtherOptionId)
+          ? null
+          : variantId.toString(),
     };
   }
 
-  /// Create from draft JSON (for resuming)
-  factory SellCarFormData.fromDraftJson(Map<String, dynamic> json) {
-    final data = SellCarFormData();
-    data.brandName = json['make'] as String?;
-    data.modelName = json['model'] as String?;
-    data.variantName = json['variantName'] as String?;
-    data.variantId = json['variantId'] as int?;
-    data.fuelType = json['fuelType'] as String?;
-    data.transmission = json['transmission'] as String?;
-    data.color = json['color'] as String?;
-    data.registrationYear = json['registrationYear'] as int?;
-    data.owner = json['owner'] as String?;
-    data.carPrice = json['carPrice'] as String?;
-    data.kmDriven = json['kmDriven'] as String?;
-    data.ownersType = json['ownersType'] as String?;
-    data.carModified = json['carModified'] as String?;
-    data.bodyType = json['bodyType'] as int?;
-    data.city = json['city'] as String?;
-    data.state = json['state'] as String?;
-    data.phoneNumber = json['phoneNumber'] as String?;
-    data.ownerName = json['ownerName'] as String?;
-    data.seatingCapacity = json['seatingCapacity'] as String?;
-    data.insurance = json['insurance'] as String?;
-    data.registration = json['registration'] as String?;
-    data.battery = json['battery'] as String?;
-    data.tyre = json['tyre'] as String?;
-    data.brakes = json['brakes'] as String?;
-    data.service = json['service'] as String?;
-    data.loan = json['loan'] as String?;
-    data.puc = json['puc'] as String?;
-    data.challan = json['challan'] as String?;
-    return data;
-  }
-
-  /// Reset all fields
   void clear() {
     brandName = null;
     modelName = null;
+    modelId = null;
     variantName = null;
     variantId = null;
+    availableColors = [];
+    otherModel = false;
+    otherVariant = false;
+    otherColor = false;
+    rcImagePath = null;
     registrationYear = null;
     owner = null;
     carPrice = null;
@@ -212,6 +203,9 @@ class SellCarFormData {
     state = null;
     phoneNumber = null;
     ownerName = null;
+    latitude = null;
+    longitude = null;
+    fullAddress = null;
     insurance = null;
     registration = null;
     battery = null;
@@ -232,7 +226,7 @@ class SellCarFormData {
   String toString() {
     return 'SellCarFormData{brand: $brandName, model: $modelName, variant: $variantName, '
         'year: $registrationYear, price: $carPrice, km: $kmDriven, fuel: $fuelType, '
-        'transmission: $transmission, owner: $owner, color: $color, city: $city, '
+        'transmission: $transmission, owner: $owner, color: $color, '
         'images: ${imagePaths.length}}';
   }
 }

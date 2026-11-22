@@ -1,0 +1,162 @@
+# Builds the Flutter iOS app on every push to main and uploads the resulting .ipa to
+# AWS Device Farm, where you can open it on a real iPhone from your browser (Remote access).
+#
+# One-time setup (see the notes at the bottom of this file):
+#   GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#     AWS_ROLE_ARN             IAM role GitHub assumes through OIDC (no long-lived keys)
+#     DEVICE_FARM_PROJECT_ARN  ARN of your Device Farm project (Device Farm is us-west-2 only)
+
+name: iOS build -> AWS Device Farm
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+
+# Needed for GitHub -> AWS OIDC login.
+permissions:
+  id-token: write
+  contents: read
+
+# A newer push cancels a build that is still running for an older commit.
+concurrency:
+  group: ios-device-farm-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-west-2 # AWS Device Farm only exists in this region.
+
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Get packages
+        run: flutter pub get
+
+      # Unsigned device build. Device Farm re-signs the app with its own wildcard provisioning
+      # profile, so no Apple certificate is needed just to test on Device Farm.
+      - name: Build iOS app (no code signing)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package .ipa
+        run: |
+          set -euo pipefail
+          IPA_NAME="garragge-${GITHUB_SHA::7}.ipa"
+          rm -rf build/ipa
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          (cd build/ipa && zip -qry "$IPA_NAME" Payload)
+          echo "IPA_NAME=$IPA_NAME" >> "$GITHUB_ENV"
+          echo "IPA_PATH=build/ipa/$IPA_NAME" >> "$GITHUB_ENV"
+          ls -lh "build/ipa/$IPA_NAME"
+
+      # Keep a copy on GitHub too (Actions run page -> Artifacts).
+      - name: Save .ipa as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_PATH }}
+          retention-days: 14
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload .ipa to AWS Device Farm
+        env:
+          PROJECT_ARN: ${{ secrets.DEVICE_FARM_PROJECT_ARN }}
+        run: |
+          set -euo pipefail
+
+          # 1) Ask Device Farm for a pre-signed upload URL.
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "$PROJECT_ARN" \
+            --name "$IPA_NAME" \
+            --type IOS_APP \
+            --output json)
+          UPLOAD_ARN=$(echo "$RESPONSE" | jq -r '.upload.arn')
+          UPLOAD_URL=$(echo "$RESPONSE" | jq -r '.upload.url')
+
+          # 2) PUT the file to that URL.
+          curl --silent --show-error --fail \
+            --upload-file "$IPA_PATH" \
+            "$UPLOAD_URL"
+
+          # 3) Wait until Device Farm has processed (and validated) the app.
+          for i in $(seq 1 60); do
+            STATUS=$(aws devicefarm get-upload --arn "$UPLOAD_ARN" \
+              --query 'upload.status' --output text)
+            echo "Upload status: $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then
+              echo "Uploaded $IPA_NAME to Device Farm."
+              echo "Upload ARN: $UPLOAD_ARN"
+              exit 0
+            fi
+            if [ "$STATUS" = "FAILED" ]; then
+              aws devicefarm get-upload --arn "$UPLOAD_ARN" \
+                --query 'upload.message' --output text || true
+              echo "Device Farm rejected the .ipa." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for Device Farm to process the upload." >&2
+          exit 1
+
+# ---------------------------------------------------------------------------------------------
+# AWS setup notes
+#
+# 1. Device Farm project: AWS Console -> Device Farm (switch region to us-west-2) -> Mobile
+#    device testing -> Create project. Copy its ARN into the DEVICE_FARM_PROJECT_ARN secret.
+#
+# 2. GitHub OIDC provider (once per AWS account): IAM -> Identity providers -> Add provider
+#    -> OpenID Connect, URL https://token.actions.githubusercontent.com, audience
+#    sts.amazonaws.com.
+#
+# 3. IAM role for this repo. Trust policy (replace ACCOUNT_ID):
+#      {
+#        "Version": "2012-10-17",
+#        "Statement": [{
+#          "Effect": "Allow",
+#          "Principal": { "Federated":
+#            "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com" },
+#          "Action": "sts:AssumeRoleWithWebIdentity",
+#          "Condition": {
+#            "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+#            "StringLike": { "token.actions.githubusercontent.com:sub":
+#              "repo:ajaysinghchoudharylive-cyber/garragge-flutter:ref:refs/heads/main" }
+#          }
+#        }]
+#      }
+#    Permissions policy:
+#      { "Version": "2012-10-17",
+#        "Statement": [{ "Effect": "Allow",
+#          "Action": ["devicefarm:CreateUpload", "devicefarm:GetUpload"],
+#          "Resource": "*" }] }
+#    Put the role's ARN in the AWS_ROLE_ARN secret.
+#
+# 4. After a successful run: Device Farm -> your project -> Remote access -> Start session ->
+#    pick an iPhone -> choose the uploaded app.
+#
+# Notes
+# - The app is re-signed by Device Farm, so push notifications (APNs) won't work in these test
+#   sessions. Everything else (login screens, camera, photos, location, uploads) can be tried.
+# - If Device Farm ever rejects the unsigned .ipa, the fix is to sign the build with an Apple
+#   development certificate and provisioning profile (needs an Apple Developer account).
+# ---------------------------------------------------------------------------------------------

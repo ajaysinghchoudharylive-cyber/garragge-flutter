@@ -1,22 +1,27 @@
-import 'package:json_annotation/json_annotation.dart';
-
-part 'car_brand_model.g.dart';
-
-@JsonSerializable()
+/// A car brand from GET cars/carLogoAndNames -> [{id, cars_logo, cars_name}].
+/// (Same shape as the Android app's CarsLogoAndNameModelNetworkEntity.)
 class CarBrandModel {
-  @JsonKey(name: 'brand_name')
+  final int? id;
   final String brandName;
-
-  @JsonKey(name: 'brand_logo')
   final String? brandLogo;
 
   CarBrandModel({
+    this.id,
     required this.brandName,
     this.brandLogo,
   });
 
-  factory CarBrandModel.fromJson(Map<String, dynamic> json) =>
-      _$CarBrandModelFromJson(json);
+  factory CarBrandModel.fromJson(Map<String, dynamic> json) {
+    return CarBrandModel(
+      id: json['id'] as int?,
+      brandName: (json['cars_name'] ?? '').toString(),
+      brandLogo: json['cars_logo']?.toString(),
+    );
+  }
 
-  Map<String, dynamic> toJson() => _$CarBrandModelToJson(this);
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'cars_name': brandName,
+        'cars_logo': brandLogo,
+      };
 }

@@ -22,12 +22,13 @@ class _StepOwnershipState extends State<StepOwnership> {
   String? _selectedOwner;
   String _selectedType = 'Individual';
 
+  // Same values the Android app saves in `cars_owners` (strings.xml first_owner ... forth_owner),
+  // so ads posted from either app read the same.
   static const List<String> _ownerOptions = [
-    '1st owner',
-    '2nd owner',
-    '3rd owner',
-    '4th owner',
-    'Beyond 4th owner',
+    'First owner',
+    'Second owner',
+    'Third owner',
+    'Forth owner',
   ];
 
   @override
@@ -79,10 +80,10 @@ class _StepOwnershipState extends State<StepOwnership> {
                     icon: Icons.store,
                     onTap: () {
                       setState(() {
-                        _selectedOwner = '1st owner';
+                        _selectedOwner = 'First owner';
                         _selectedType = 'Dealer';
                       });
-                      widget.onOwnerSelected('1st owner', 'Dealer');
+                      widget.onOwnerSelected('First owner', 'Dealer');
                     },
                   );
                 }

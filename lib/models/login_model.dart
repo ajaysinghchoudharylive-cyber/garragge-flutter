@@ -9,6 +9,12 @@ class LoginModel {
   final String terms;
   final UserResponseData? user;
 
+  /// Short-lived access token sent as `Authorization: Bearer ...` on every API call.
+  final String jwtToken;
+
+  /// Long-lived token used to silently renew [jwtToken] (POST cars/login/refresh).
+  final String? refreshToken;
+
   LoginModel({
     required this.userToken,
     required this.version,
@@ -17,6 +23,8 @@ class LoginModel {
     required this.policies,
     required this.terms,
     this.user,
+    this.jwtToken = "",
+    this.refreshToken,
   });
 
   bool get isSuccess {
@@ -37,6 +45,8 @@ class LoginModel {
       user: json['user'] != null
           ? UserResponseData.fromJson(json['user'])
           : null,
+      jwtToken: json['jwtToken']?.toString() ?? "",
+      refreshToken: json['refreshToken']?.toString(),
     );
   }
 }

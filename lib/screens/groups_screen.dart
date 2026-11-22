@@ -16,7 +16,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CarsBuzz'),
+        title: const Text('Garragge.com'),
         actions: [
           IconButton(
             icon: const Icon(Icons.group_add),

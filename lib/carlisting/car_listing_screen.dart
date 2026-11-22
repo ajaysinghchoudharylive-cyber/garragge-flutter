@@ -5,6 +5,7 @@ import 'package:carsbuzz/network/api_client.dart';
 import 'package:carsbuzz/network/repository_api.dart';
 import 'package:carsbuzz/carlisting/car_listing_card.dart';
 import 'package:carsbuzz/carlisting/car_listing_filters.dart';
+import 'package:carsbuzz/widgets/notification_permission_prompt.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Car Listing screen - mirrors native FragmentCarListing
@@ -106,12 +107,25 @@ class _CarListingScreenState extends State<CarListingScreen> {
           _currentPage = 0;
           _isLoading = false;
         });
+        _askForNotificationsOnce();
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  bool _notificationPromptChecked = false;
+
+  /// Once per visit, after the list has loaded: if notifications are off, ask the user to turn
+  /// them back on (throttled to every few days inside the prompt).
+  void _askForNotificationsOnce() {
+    if (_notificationPromptChecked) return;
+    _notificationPromptChecked = true;
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) NotificationPermissionPrompt.maybeAsk(context);
+    });
   }
 
   Future<void> _fetchMoreCars() async {

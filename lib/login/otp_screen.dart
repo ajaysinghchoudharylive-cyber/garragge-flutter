@@ -5,6 +5,8 @@ import 'package:carsbuzz/network/api_client.dart';
 import 'package:carsbuzz/network/firebase_service.dart';
 import 'package:carsbuzz/network/repository_api.dart';
 import 'package:carsbuzz/models/signup_user_model.dart';
+import 'package:carsbuzz/network/token_store.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,9 +87,24 @@ class _OtpScreenState extends State<OtpScreen> {
       
       if (response.isSuccess) {
         print('🔍 Login successful, saving data...');
+        // The backend now requires a JWT on every call (same as the Android app). Without the
+        // token the user must not be treated as logged in.
+        if (response.jwtToken.isEmpty) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Login failed: no session token received')),
+            );
+          }
+          return;
+        }
+        await TokenStore.saveTokens(response.jwtToken, response.refreshToken);
+
         // Save login status
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_logged_in', true);
+        await prefs.setString('policies', response.policies);
+        await prefs.setString('terms', response.terms);
         
         // Save user data if available
         if (response.user != null) {
@@ -99,6 +116,12 @@ class _OtpScreenState extends State<OtpScreen> {
           }
           if (user.username != null) {
             await prefs.setString('username', user.username!);
+          }
+          // Sell-car posts need the owner's phone number and role.
+          await prefs.setString(
+              'phone_number', user.phone ?? widget.phoneNumber);
+          if (user.role != null) {
+            await prefs.setString('role', user.role!);
           }
           if (user.state != null) {
             await prefs.setString('state', user.state!);
@@ -280,7 +303,9 @@ class _OtpScreenState extends State<OtpScreen> {
                                                                                                                                     
                                                                                                                                     try {
                                                                                                                                       // Check for hardcoded test OTP first
-                                                                                                                                      if (_otp == "123123") {
+                                                                                                                                      // Debug-only shortcut. In release it would let anyone obtain a
+                                                                                                                                      // real session token for any phone number.
+                                                                                                                                      if (kDebugMode && _otp == "123123") {
                                                                                                                                         print('🔍 Using hardcoded test OTP - bypassing Firebase verification');
                                                                                                                                         await _callLoginAPI();
                                                                                                                                         return;

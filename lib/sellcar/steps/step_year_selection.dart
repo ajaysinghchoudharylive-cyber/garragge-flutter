@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:carsbuzz/sellcar/repository/sell_car_repository.dart';
 
-/// Step 3: Registration year selection - mirrors native SelectRegistrationYearFragment
-class StepYearSelection extends StatelessWidget {
+/// Step: Registration year - mirrors native SelectRegistrationYearFragment.
+/// Years come from GET cars/carsRegistrationsYears (falls back to the last 25 years).
+class StepYearSelection extends StatefulWidget {
   final int? selectedYear;
   final ValueChanged<int> onYearSelected;
 
@@ -11,13 +13,35 @@ class StepYearSelection extends StatelessWidget {
     required this.onYearSelected,
   });
 
-  List<int> get _years {
-    final currentYear = DateTime.now().year;
-    return List.generate(25, (i) => currentYear - i);
+  @override
+  State<StepYearSelection> createState() => _StepYearSelectionState();
+}
+
+class _StepYearSelectionState extends State<StepYearSelection> {
+  final SellCarRepository _repo = SellCarRepository();
+  List<int> _years = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final years = await _repo.getRegistrationYears();
+    if (!mounted) return;
+    setState(() {
+      _years = years;
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -25,10 +49,7 @@ class StepYearSelection extends StatelessWidget {
         children: [
           Text(
             'Select the year of registration',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -42,14 +63,13 @@ class StepYearSelection extends StatelessWidget {
               itemCount: _years.length,
               itemBuilder: (context, index) {
                 final year = _years[index];
-                final isSelected = selectedYear == year;
+                final isSelected = widget.selectedYear == year;
                 return GestureDetector(
-                  onTap: () => onYearSelected(year),
+                  onTap: () => widget.onYearSelected(year),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFF1A73E8)
-                          : Colors.white,
+                      color:
+                          isSelected ? const Color(0xFF1A73E8) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSelected

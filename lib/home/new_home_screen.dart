@@ -504,7 +504,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> {
             Icon(Icons.directions_car, color: Colors.white, size: 48),
             SizedBox(height: 8),
             Text(
-              'Welcome to CarsBuzz',
+              'Welcome to Garragge.com',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,

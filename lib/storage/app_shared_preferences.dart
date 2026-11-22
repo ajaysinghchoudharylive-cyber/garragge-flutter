@@ -59,6 +59,10 @@ class AppSharedPreferences {
     await prefs.remove('is_premium');
     await prefs.remove('selected_address');
     await prefs.remove('selected_address_title');
+    await prefs.remove('jwt_token');
+    await prefs.remove('refresh_token');
+    await prefs.remove('phone_number');
+    await prefs.remove('role');
     await prefs.setBool('is_logged_in', false);
     // Keep policies and terms as they're not user-specific
   }

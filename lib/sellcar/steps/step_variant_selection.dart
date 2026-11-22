@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:carsbuzz/sellcar/models/car_variant_response.dart';
+import 'package:carsbuzz/sellcar/models/sell_car_models.dart';
 import 'package:carsbuzz/sellcar/repository/sell_car_repository.dart';
 
-/// Step 3: Variant selection - mirrors native CarVariant fragment
-/// Shows variants with specs (engine, HP, mileage, transmission)
-/// User can skip if variant not available
+/// Step 3: Variant selection - mirrors native SelectCarsVariantsBottomSheetFragment.
+/// Variants come from GET cars/{brandName}/models/{modelId}/variants. The user can skip when
+/// they don't know their variant.
 class StepVariantSelection extends StatefulWidget {
   final String brandName;
   final String modelName;
+
+  /// Id of the chosen model. Variants can't be loaded without it.
+  final int? modelId;
   final String? selectedVariant;
-  final void Function(String name, int? id, String? transmission, String? seating) onVariantSelected;
+  final ValueChanged<CarVariantItem> onVariantSelected;
   final VoidCallback onSkip;
 
   const StepVariantSelection({
     super.key,
     required this.brandName,
     required this.modelName,
+    required this.modelId,
     this.selectedVariant,
     required this.onVariantSelected,
     required this.onSkip,
@@ -29,9 +33,13 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
   final SellCarRepository _repo = SellCarRepository();
   final TextEditingController _searchController = TextEditingController();
 
-  List<CarVariantResponse> _variants = [];
-  List<CarVariantResponse> _filteredVariants = [];
-  bool _isLoading = true;
+  List<CarVariantItem> _variants = [];
+  List<CarVariantItem> _filteredVariants = [];
+  bool _isLoading = false;
+  bool _hasError = false;
+  String _loadedKey = '';
+
+  String get _key => '${widget.brandName}|${widget.modelId}';
 
   @override
   void initState() {
@@ -42,40 +50,56 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
   @override
   void didUpdateWidget(StepVariantSelection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.brandName != widget.brandName ||
-        oldWidget.modelName != widget.modelName) {
+    if (_key != _loadedKey) {
+      _searchController.clear();
       _loadVariants();
     }
   }
 
   Future<void> _loadVariants() async {
-    if (widget.brandName.isEmpty || widget.modelName.isEmpty) return;
-    setState(() => _isLoading = true);
-
-    // modelId is typically derived from model name; use 0 as placeholder
-    // The API handles brand + model lookup
-    final variants = await _repo.getVariants(widget.brandName.toLowerCase(), 0);
-
-    if (mounted) {
+    final id = widget.modelId;
+    if (widget.brandName.isEmpty || id == null || id <= 0) {
+      // Nothing to load yet (before a model is chosen) or an "Other" model with no variants.
+      setState(() {
+        _variants = [];
+        _filteredVariants = [];
+        _isLoading = false;
+        _hasError = false;
+        _loadedKey = _key;
+      });
+      return;
+    }
+    final key = _key;
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _loadedKey = key;
+    });
+    try {
+      final variants = await _repo.getVariants(widget.brandName, id);
+      if (!mounted || key != _key) return;
       setState(() {
         _variants = variants;
-        _filteredVariants = variants;
+        _filteredVariants = _applyFilter(variants, _searchController.text);
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || key != _key) return;
+      setState(() {
+        _variants = [];
+        _filteredVariants = [];
+        _hasError = true;
         _isLoading = false;
       });
     }
   }
 
-  void _onSearchChanged(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredVariants = _variants;
-      } else {
-        _filteredVariants = _variants
-            .where((v) =>
-                (v.variantName ?? '').toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
-    });
+  List<CarVariantItem> _applyFilter(List<CarVariantItem> source, String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return source;
+    return source
+        .where((v) => v.isOther || v.name.toLowerCase().contains(q))
+        .toList();
   }
 
   @override
@@ -92,12 +116,12 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
 
     return Column(
       children: [
-        // Search bar
         Padding(
           padding: const EdgeInsets.all(16),
           child: TextField(
             controller: _searchController,
-            onChanged: _onSearchChanged,
+            onChanged: (q) =>
+                setState(() => _filteredVariants = _applyFilter(_variants, q)),
             decoration: InputDecoration(
               hintText: 'Search variant...',
               prefixIcon: const Icon(Icons.search, color: Colors.grey),
@@ -111,8 +135,6 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
             ),
           ),
         ),
-
-        // Skip button
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -129,8 +151,6 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
             ],
           ),
         ),
-
-        // Variant list
         Expanded(
           child: _filteredVariants.isEmpty
               ? _buildEmptyState()
@@ -140,18 +160,10 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final variant = _filteredVariants[index];
-                    final isSelected =
-                        widget.selectedVariant == variant.variantName;
-
                     return _VariantTile(
                       variant: variant,
-                      isSelected: isSelected,
-                      onTap: () => widget.onVariantSelected(
-                        variant.variantName ?? '',
-                        variant.id,
-                        variant.transmission,
-                        variant.seatingCapacity,
-                      ),
+                      isSelected: widget.selectedVariant == variant.name,
+                      onTap: () => widget.onVariantSelected(variant),
                     );
                   },
                 ),
@@ -168,10 +180,14 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
           Icon(Icons.info_outline, size: 48, color: Colors.grey.shade400),
           const SizedBox(height: 12),
           Text(
-            'No variants found for ${widget.modelName}',
+            _hasError
+                ? "Couldn't load variants"
+                : 'No variants found for ${widget.modelName}',
             style: const TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 16),
+          if (_hasError)
+            TextButton(onPressed: _loadVariants, child: const Text('Retry')),
           ElevatedButton(
             onPressed: widget.onSkip,
             style: ElevatedButton.styleFrom(
@@ -190,7 +206,7 @@ class _StepVariantSelectionState extends State<StepVariantSelection> {
 }
 
 class _VariantTile extends StatelessWidget {
-  final CarVariantResponse variant;
+  final CarVariantItem variant;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -202,6 +218,7 @@ class _VariantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final specs = variant.displaySpecs;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -218,24 +235,19 @@ class _VariantTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    variant.variantName ?? 'Unknown',
+                    variant.name,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected
-                          ? const Color(0xFF1A73E8)
-                          : Colors.black87,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color:
+                          isSelected ? const Color(0xFF1A73E8) : Colors.black87,
                     ),
                   ),
-                  if (variant.displaySpecs.isNotEmpty) ...[
+                  if (specs.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      variant.displaySpecs,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
+                      specs,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ],
                 ],

@@ -227,7 +227,7 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen> {
 
 Use my referral code: $referralCode
 
-Download CarsBuzz app and book your car service today!
+Download Garragge.com app and book your car service today!
 
 *Terms and conditions apply
     '''.trim();

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:carsbuzz/models/car_brand_model.dart';
-import 'package:carsbuzz/network/api_client.dart';
-import 'package:carsbuzz/network/repository_api.dart';
+import 'package:carsbuzz/sellcar/repository/sell_car_repository.dart';
 
-/// Step 1: Brand selection - mirrors native SelectYourCarBrandFragment
+/// Step 1: Brand selection - mirrors native SelectYourCarBrandFragment.
+/// Brands (with logos) come from GET cars/carLogoAndNames.
 class StepBrandSelection extends StatefulWidget {
   final String? selectedBrand;
   final ValueChanged<String> onBrandSelected;
@@ -19,15 +19,17 @@ class StepBrandSelection extends StatefulWidget {
 }
 
 class _StepBrandSelectionState extends State<StepBrandSelection> {
-  final RepositoryApi _api = ApiClient.create();
+  final SellCarRepository _repo = SellCarRepository();
   final TextEditingController _searchController = TextEditingController();
 
   List<CarBrandModel> _brands = [];
   List<CarBrandModel> _filteredBrands = [];
   bool _isLoading = true;
+  bool _hasError = false;
 
-  // Popular brands shown at top
-  static const List<String> _popularBrands = [
+  // Names promoted to the "Popular Brands" row. Only brands that the server actually returns are
+  // shown, so a popular chip can never lead to a brand that has no models.
+  static const List<String> _popularBrandNames = [
     'Maruti Suzuki',
     'Hyundai',
     'Tata',
@@ -38,6 +40,14 @@ class _StepBrandSelectionState extends State<StepBrandSelection> {
     'MG',
   ];
 
+  List<CarBrandModel> get _popularBrands {
+    final byName = {for (final b in _brands) b.brandName.toLowerCase(): b};
+    return _popularBrandNames
+        .map((n) => byName[n.toLowerCase()])
+        .whereType<CarBrandModel>()
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,40 +55,35 @@ class _StepBrandSelectionState extends State<StepBrandSelection> {
   }
 
   Future<void> _loadBrands() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
-      final brands = await _api.getCarBrands();
-      if (mounted) {
-        setState(() {
-          _brands = brands;
-          _filteredBrands = brands;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      // Fallback to popular brands if API fails
-      if (mounted) {
-        setState(() {
-          _brands = _popularBrands
-              .map((b) => CarBrandModel(brandName: b))
-              .toList();
-          _filteredBrands = _brands;
-          _isLoading = false;
-        });
-      }
+      final brands = await _repo.getCarBrands();
+      if (!mounted) return;
+      setState(() {
+        _brands = brands;
+        _filteredBrands = _applyFilter(brands, _searchController.text);
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
     }
   }
 
+  List<CarBrandModel> _applyFilter(List<CarBrandModel> source, String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return source;
+    return source.where((b) => b.brandName.toLowerCase().contains(q)).toList();
+  }
+
   void _onSearchChanged(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredBrands = _brands;
-      } else {
-        _filteredBrands = _brands
-            .where((b) =>
-                b.brandName.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
-    });
+    setState(() => _filteredBrands = _applyFilter(_brands, query));
   }
 
   @override
@@ -93,9 +98,26 @@ class _StepBrandSelectionState extends State<StepBrandSelection> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.wifi_off, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Text("Couldn't load brands",
+                style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 12),
+            TextButton(onPressed: _loadBrands, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+
+    final popular = _popularBrands;
+
     return Column(
       children: [
-        // Search bar
         Padding(
           padding: const EdgeInsets.all(16),
           child: TextField(
@@ -115,8 +137,7 @@ class _StepBrandSelectionState extends State<StepBrandSelection> {
           ),
         ),
 
-        // Popular brands section
-        if (_searchController.text.isEmpty) ...[
+        if (_searchController.text.isEmpty && popular.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Align(
@@ -137,55 +158,17 @@ class _StepBrandSelectionState extends State<StepBrandSelection> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _popularBrands.length,
+              itemCount: popular.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final brandName = _popularBrands[index];
-                final isSelected = widget.selectedBrand == brandName;
-                return GestureDetector(
-                  onTap: () => widget.onBrandSelected(brandName),
-                  child: Container(
-                    width: 75,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFE3F2FD)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF1A73E8)
-                            : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.directions_car,
-                          color: isSelected
-                              ? const Color(0xFF1A73E8)
-                              : Colors.grey,
-                          size: 28,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          brandName,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: isSelected
-                                ? const Color(0xFF1A73E8)
-                                : Colors.black87,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+              itemBuilder: (context, index) => SizedBox(
+                width: 75,
+                child: _BrandTile(
+                  brand: popular[index],
+                  isSelected: widget.selectedBrand == popular[index].brandName,
+                  compact: true,
+                  onTap: () => widget.onBrandSelected(popular[index].brandName),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -209,80 +192,95 @@ class _StepBrandSelectionState extends State<StepBrandSelection> {
           ),
         ],
 
-        // All brands grid
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 1.1,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: _filteredBrands.length,
-            itemBuilder: (context, index) {
-              final brand = _filteredBrands[index];
-              final isSelected = widget.selectedBrand == brand.brandName;
-              return GestureDetector(
-                onTap: () => widget.onBrandSelected(brand.brandName),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFE3F2FD)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF1A73E8)
-                          : Colors.grey.shade300,
-                    ),
+          child: _filteredBrands.isEmpty
+              ? const Center(
+                  child: Text('No brands found',
+                      style: TextStyle(color: Colors.grey)),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.1,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (brand.brandLogo != null)
-                        Image.network(
-                          brand.brandLogo!,
-                          width: 36,
-                          height: 36,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.directions_car,
-                            color: isSelected
-                                ? const Color(0xFF1A73E8)
-                                : Colors.grey,
-                            size: 32,
-                          ),
-                        )
-                      else
-                        Icon(
-                          Icons.directions_car,
-                          color: isSelected
-                              ? const Color(0xFF1A73E8)
-                              : Colors.grey,
-                          size: 32,
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        brand.brandName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: isSelected
-                              ? const Color(0xFF1A73E8)
-                              : Colors.black87,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                  itemCount: _filteredBrands.length,
+                  itemBuilder: (context, index) {
+                    final brand = _filteredBrands[index];
+                    return _BrandTile(
+                      brand: brand,
+                      isSelected: widget.selectedBrand == brand.brandName,
+                      onTap: () => widget.onBrandSelected(brand.brandName),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
+    );
+  }
+}
+
+class _BrandTile extends StatelessWidget {
+  final CarBrandModel brand;
+  final bool isSelected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  const _BrandTile({
+    required this.brand,
+    required this.isSelected,
+    required this.onTap,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isSelected ? const Color(0xFF1A73E8) : Colors.grey;
+    final logo = brand.brandLogo;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE3F2FD) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1A73E8) : Colors.grey.shade300,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (logo != null && logo.isNotEmpty)
+              Image.network(
+                logo,
+                width: compact ? 30 : 36,
+                height: compact ? 30 : 36,
+                errorBuilder: (_, __, ___) =>
+                    Icon(Icons.directions_car, color: accent, size: 28),
+              )
+            else
+              Icon(Icons.directions_car, color: accent, size: 28),
+            SizedBox(height: compact ? 6 : 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                brand.brandName,
+                style: TextStyle(
+                  fontSize: compact ? 10 : 12,
+                  fontWeight: FontWeight.w500,
+                  color: isSelected ? const Color(0xFF1A73E8) : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

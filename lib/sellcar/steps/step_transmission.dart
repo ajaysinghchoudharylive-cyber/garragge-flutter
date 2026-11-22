@@ -22,6 +22,11 @@ class StepTransmission extends StatelessWidget {
       'icon': Icons.auto_mode,
       'description': 'Automatic transmission',
     },
+    {
+      'name': 'Semi - Automatic',
+      'icon': Icons.tune,
+      'description': 'Clutch-less manual (AMT / iMT)',
+    },
   ];
 
   @override

@@ -14,10 +14,16 @@
 	<string>This app needs access to location to provide delivery services at your current location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs access to location to provide delivery services at your current location.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Garragge needs the camera so you can take photos of your car (and its registration certificate) for your ad.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Garragge needs access to your photos so you can choose pictures of your car for your ad.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Garragge needs the microphone to record sound when you film a video of your car.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Carsbuzz</string>
+	<string>Garragge</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

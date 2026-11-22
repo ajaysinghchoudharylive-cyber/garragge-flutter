@@ -16,12 +16,21 @@ class StepUploadImages extends StatefulWidget {
   final ValueChanged<List<String>> onImagesChanged;
   final VoidCallback onSubmit;
 
+  /// True when the seller picked an "Other" model/variant/colour: an RC (registration
+  /// certificate) photo is then required so an admin can verify the details.
+  final bool requiresRc;
+  final String? rcImagePath;
+  final ValueChanged<String?>? onRcChanged;
+
   const StepUploadImages({
     super.key,
     required this.imageUrls,
     required this.isSubmitting,
     required this.onImagesChanged,
     required this.onSubmit,
+    this.requiresRc = false,
+    this.rcImagePath,
+    this.onRcChanged,
   });
 
   @override
@@ -37,6 +46,89 @@ class _StepUploadImagesState extends State<StepUploadImages> {
   static const int _maxPhotos = 20;
 
   bool get _hasMinimumPhotos => widget.imageUrls.length >= _minPhotos;
+
+  bool get _hasRc =>
+      widget.rcImagePath != null && widget.rcImagePath!.isNotEmpty;
+
+  bool get _canContinue => _hasMinimumPhotos && (!widget.requiresRc || _hasRc);
+
+  Future<void> _pickRc(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+      if (image != null) widget.onRcChanged?.call(image.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not pick RC photo: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildRcCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _hasRc ? Colors.green.shade300 : const Color(0xFFFFB74D),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'RC photo required',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'You chose an option that is not in our list. Add a photo of your '
+            'registration certificate (RC) so we can verify the details.',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 8),
+          if (_hasRc)
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text('RC photo added', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton(
+                  onPressed: () => widget.onRcChanged?.call(null),
+                  child: const Text('Remove'),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _pickRc(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt, size: 16),
+                  label: const Text('Camera'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _pickRc(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library, size: 16),
+                  label: const Text('Gallery'),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _pickFromCamera() async {
     if (widget.imageUrls.length >= _maxPhotos) {
@@ -294,6 +386,8 @@ class _StepUploadImagesState extends State<StepUploadImages> {
           ),
         ),
 
+        if (widget.requiresRc) _buildRcCard(),
+
         // Tips
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -324,7 +418,7 @@ class _StepUploadImagesState extends State<StepUploadImages> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: _hasMinimumPhotos ? widget.onSubmit : null,
+              onPressed: _canContinue ? widget.onSubmit : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A73E8),
                 disabledBackgroundColor: Colors.grey.shade300,
@@ -334,7 +428,7 @@ class _StepUploadImagesState extends State<StepUploadImages> {
               ),
               child: Text(
                 _hasMinimumPhotos
-                    ? 'Continue'
+                    ? (_canContinue ? 'Continue' : 'Add RC photo')
                     : 'Add ${_minPhotos - widget.imageUrls.length} more photo${_minPhotos - widget.imageUrls.length == 1 ? '' : 's'}',
                 style: const TextStyle(
                   color: Colors.white,

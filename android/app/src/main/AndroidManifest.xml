@@ -1,10 +1,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Hardware features are marked NOT required so Google Play doesn't hide the app from
+         devices lacking them. Several are otherwise implied by permissions/plugins (camera by
+         image_picker, location/gps by the location permissions and maps, wifi by SDKs, portrait
+         by orientation locks). -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+    <!-- Network access. Flutter only adds this for debug/profile builds, so without it a release
+         build can't reach the API at all. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Permissions needed for location services -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Required on Android 13+ for the notification permission prompt to be able to appear. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
     <application
-        android:label="carsbuzz"
+        android:label="Garragge"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

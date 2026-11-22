@@ -1,6 +1,7 @@
 
 import 'package:carsbuzz/auth/auth_wrapper.dart';
 import 'package:carsbuzz/network/firebase_service.dart';
+import 'package:carsbuzz/network/session_events.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +20,17 @@ Future<void> main() async {
     debugPrint('🔥 Continuing in test mode...');
   }
 
+  // When the refresh token is refused the stored session has already been cleared; send the user
+  // back to login (AuthWrapper shows LoginScreen because is_logged_in is now false).
+  SessionEvents.onSessionExpired = () {
+    final navigator = SessionEvents.navigatorKey.currentState;
+    if (navigator == null) return;
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthWrapper()),
+      (route) => false,
+    );
+  };
+
   runApp(const MyApp());
 }
 
@@ -28,6 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: SessionEvents.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         // Apply Roboto font to the entire app
