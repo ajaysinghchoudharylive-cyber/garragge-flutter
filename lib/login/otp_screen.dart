@@ -21,10 +21,16 @@ class OtpScreen extends StatefulWidget {
   final String phoneNumber;
   final LoginOrigin origin;
 
+  /// Opened from the More tab's "Want to update your name?" banner (Android
+  /// VerifyIdentityFragment -> FragmentVerifyNameOtp -> update name). The user is already logged
+  /// in, so after the code is verified it goes straight to the name form.
+  final bool forNameUpdate;
+
   const OtpScreen({
     super.key,
     required this.phoneNumber,
     this.origin = LoginOrigin.home,
+    this.forNameUpdate = false,
   });
 
   @override
@@ -207,6 +213,18 @@ class _OtpScreenState extends State<OtpScreen> {
     _isSubmitting = false;
     _timer?.cancel();
     _isTimerRunning = false;
+    if (widget.forNameUpdate) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => ProfileDetailsScreen(
+          phoneNumber: widget.phoneNumber,
+          origin: widget.origin,
+          isNameUpdate: true,
+        ),
+      ));
+      return;
+    }
     await _loginWithBackend();
   }
 
@@ -397,10 +415,15 @@ class _OtpScreenState extends State<OtpScreen> {
                   height: 64,
                   margin: EdgeInsets.only(right: i < 5 ? 8 : 0),
                   alignment: Alignment.center,
+                  // otp_boxes_background.xml (#F1F5F9, radius 8). That fill is almost white on
+                  // iPhone screens, so every box also gets a light border to stay visible.
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
-                    border: focused ? Border.all(color: AppColors.accent, width: 1.5) : null,
+                    border: Border.all(
+                      color: focused ? AppColors.accent : const Color(0xFFCBD5E1),
+                      width: focused ? 1.5 : 1,
+                    ),
                   ),
                   child: Text(
                     filled ? '*' : '',

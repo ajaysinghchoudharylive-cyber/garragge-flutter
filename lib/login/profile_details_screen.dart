@@ -11,10 +11,15 @@ class ProfileDetailsScreen extends StatefulWidget {
   final String phoneNumber;
   final LoginOrigin origin;
 
+  /// Opened from the More tab to change an existing name: the user may go back, and the
+  /// fields start with the saved name.
+  final bool isNameUpdate;
+
   const ProfileDetailsScreen({
     super.key,
     required this.phoneNumber,
     this.origin = LoginOrigin.home,
+    this.isNameUpdate = false,
   });
 
   @override
@@ -36,6 +41,21 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     super.initState();
     _firstController.addListener(_revalidate);
     _lastController.addListener(_revalidate);
+    if (widget.isNameUpdate) _prefillName();
+  }
+
+  Future<void> _prefillName() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    var first = prefs.getString('first_name') ?? '';
+    var last = prefs.getString('last_name') ?? '';
+    if (first.isEmpty && last.isEmpty) {
+      final parts = (prefs.getString('username') ?? '').trim().split(RegExp(r'\s+'));
+      first = parts.first;
+      last = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+    }
+    _firstController.text = first;
+    _lastController.text = last;
   }
 
   @override
@@ -108,8 +128,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     const fieldStyle =
         TextStyle(fontFamily: 'Outfit', fontSize: 16, color: AppColors.textPrimary);
     return PopScope(
-      // The account already exists at this point; the name is required before continuing.
-      canPop: false,
+      // After signup the account already exists, so the name is required before continuing.
+      // A name change from the More tab can be abandoned.
+      canPop: widget.isNameUpdate,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -118,6 +139,16 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.isNameUpdate)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      alignment: Alignment.centerLeft,
+                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
                 const Text(
                   'Profile Details',
                   style: TextStyle(

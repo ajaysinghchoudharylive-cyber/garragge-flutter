@@ -2,10 +2,13 @@ import 'package:carsbuzz/cardetails/car_details_screen.dart';
 import 'package:carsbuzz/carlisting/car_ad.dart';
 import 'package:carsbuzz/carlisting/car_api.dart';
 import 'package:carsbuzz/carlisting/car_listing_filters.dart';
+import 'package:carsbuzz/favorites/favorites_screen.dart';
 import 'package:carsbuzz/home/city_selection_sheet.dart';
 import 'package:carsbuzz/sellcar/models/sell_car_models.dart';
 import 'package:carsbuzz/theme/app_colors.dart';
+import 'package:carsbuzz/widgets/app_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Buy listing, a port of the Android FragmentCarListing + CarListPagingAdapter
@@ -23,6 +26,10 @@ class CarListingScreen extends StatefulWidget {
   /// Opened from a home brand/model search: location is not applied (Android isFromSearch).
   final bool isFromSearch;
 
+  /// Back arrow action when this is the root of the Buy tab (nothing to pop). Android's iv_back
+  /// pops back to the previous destination, which is the dashboard.
+  final VoidCallback? onBack;
+
   const CarListingScreen({
     super.key,
     this.initialBrand,
@@ -34,6 +41,7 @@ class CarListingScreen extends StatefulWidget {
     this.initialMaxPrice,
     this.initialBodyType,
     this.isFromSearch = false,
+    this.onBack,
   });
 
   @override
@@ -257,61 +265,32 @@ class _CarListingScreenState extends State<CarListingScreen> {
     ];
   }
 
+  void _onBackTap() {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+    } else {
+      widget.onBack?.call();
+    }
+  }
+
+  Future<void> _openWishlist() async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const FavoritesScreen()));
+    final favs = await FavoritesStore.all();
+    if (mounted) setState(() => _favorites = favs);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
     final chips = _chips;
-    final place = _city.isNotEmpty ? _city : 'Location';
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-              child: Row(
-                children: [
-                  if (canPop)
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black),
-                      onPressed: () => Navigator.of(context).pop(),
-                    )
-                  else
-                    const SizedBox(width: 8),
-                  Expanded(
-                    child: InkWell(
-                      onTap: _pickCity,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(place,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w700)),
-                          ),
-                          const Icon(Icons.keyboard_arrow_down, size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: Row(
-                children: [
-                  _barButton(Icons.tune, 'Filter', _openFilters),
-                  const SizedBox(width: 10),
-                  _barButton(Icons.sort, 'Sort', _openSort),
-                ],
-              ),
-            ),
+            _header(),
+            _filterCategories(chips.length),
             if (chips.isNotEmpty)
               Container(
                 color: Colors.white,
@@ -356,14 +335,159 @@ class _CarListingScreenState extends State<CarListingScreen> {
     );
   }
 
-  Widget _barButton(IconData icon, String label, VoidCallback onTap) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18, color: Colors.black),
-      label: Text(label, style: const TextStyle(color: Colors.black)),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE0E0E0)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  static Widget _svg(String name, {Color? tint, double? size}) => SvgPicture.asset(
+        'assets/icons/$name.svg',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        colorFilter: tint == null ? null : ColorFilter.mode(tint, BlendMode.srcIn),
+      );
+
+  /// 40dp touch target with a 10dp-padded black icon (iv_search / iv_wishlist_top).
+  Widget _headerIcon(String icon, VoidCallback onTap) {
+    return InkResponse(
+      onTap: onTap,
+      radius: 22,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: _svg(icon, tint: Colors.black),
+        ),
+      ),
+    );
+  }
+
+  /// fragment_car_listing.xml layout_header (?attr/actionBarSize = 56dp):
+  /// round back button, "Buy Car", location chip, search, wishlist.
+  Widget _header() {
+    final place = _city.isNotEmpty ? _city : 'Select City';
+    return Container(
+      color: Colors.white,
+      height: 56,
+      child: Row(
+        children: [
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _onBackTap,
+            child: Container(
+              width: 40,
+              height: 40,
+              padding: const EdgeInsets.all(10),
+              decoration:
+                  const BoxDecoration(color: Color(0xFFF3F4F6), shape: BoxShape.circle),
+              child: _svg('back_orange', tint: Colors.black),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text('Buy Car', style: TextStyle(fontSize: 16, color: Colors.black)),
+          const Spacer(),
+          // bg_location_chip: white, radius 20, 1dp #F44336 stroke.
+          GestureDetector(
+            onTap: _pickCity,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 140),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFF44336)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(place,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w500, color: _purple)),
+                  ),
+                  const SizedBox(width: 4),
+                  _svg('ic_drop_down', tint: _purple, size: 12),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Android: the search icon opens the filter/refine screen.
+          _headerIcon('ic_search', _openFilters),
+          const SizedBox(width: 4),
+          _headerIcon('heart_gray', _openWishlist),
+          const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+
+  /// rv_filter_categories (BuyCarFilterCategoryAdapter): Filter (count badge), Sort,
+  /// Price Range, Fuel Type. Price and fuel are edited in the same filter sheet.
+  Widget _filterCategories(int activeCount) {
+    return Container(
+      color: Colors.white,
+      height: 46,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        children: [
+          _categoryChip('Filter', icon: 'ic_filter', count: activeCount, onTap: _openFilters),
+          // Android passes R.drawable.ic_drop_down as Sort's icon too (untinted, before the text).
+          _categoryChip('Sort', icon: 'ic_drop_down', onTap: _openSort),
+          _categoryChip('Price Range', onTap: _openFilters),
+          _categoryChip('Fuel Type', onTap: _openFilters),
+        ],
+      ),
+    );
+  }
+
+  /// item_buy_car_filter_category.xml: radius 20, 1dp #E0E0E0 stroke, 12sp medium text,
+  /// 10dp drop-down arrow.
+  Widget _categoryChip(String name,
+      {String? icon, int count = 0, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE0E0E0)),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          customBorder:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (count > 0) ...[
+                  Container(
+                    width: 16,
+                    height: 16,
+                    alignment: Alignment.center,
+                    // bg_circle_red.xml (the colour really is #BCA4FF).
+                    decoration: const BoxDecoration(
+                        color: Color(0xFFBCA4FF), shape: BoxShape.circle),
+                    child: Text('$count',
+                        style: const TextStyle(fontSize: 8, color: Colors.white)),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                if (icon != null) ...[
+                  _svg(icon, size: 14),
+                  const SizedBox(width: 4),
+                ],
+                Text(name,
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black)),
+                const SizedBox(width: 4),
+                _svg('ic_drop_down', tint: Colors.black, size: 10),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -551,12 +675,8 @@ class CarPhoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final u = url;
-    if (u == null || u.isEmpty) {
-      return Container(
-        color: const Color(0xFFF1F5F9),
-        child: const Icon(Icons.directions_car, size: 64, color: Colors.black26),
-      );
-    }
+    // Android: Glide .placeholder(R.drawable.car_placeholder) while loading / without a URL.
+    if (u == null || u.isEmpty) return const CarPlaceholder();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -567,12 +687,8 @@ class CarPhoto extends StatelessWidget {
             child: Image.network(u, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
           ),
         ),
-        Image.network(
-          u,
-          fit: fit,
-          errorBuilder: (_, __, ___) =>
-              const Icon(Icons.directions_car, size: 64, color: Colors.white54),
-        ),
+        // Covers the black backdrop with the white placeholder until the photo arrives.
+        AppNetworkImage(u, fit: fit),
       ],
     );
   }

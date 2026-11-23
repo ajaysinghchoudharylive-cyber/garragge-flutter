@@ -398,6 +398,13 @@ class _CitySelectionSheetState extends State<CitySelectionSheet> {
                         ? const Icon(Icons.location_city, color: Colors.black26)
                         : Image.network(c.image,
                             fit: BoxFit.contain,
+                            frameBuilder: (_, child, frame, sync) => sync || frame != null
+                                ? child
+                                : const Center(
+                                    child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2))),
                             errorBuilder: (_, __, ___) =>
                                 const Icon(Icons.location_city, color: Colors.black26)),
                   ),

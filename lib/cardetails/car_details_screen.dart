@@ -6,6 +6,7 @@ import 'package:carsbuzz/carlisting/car_listing_screen.dart' show CarPhoto;
 import 'package:carsbuzz/login/login_screen.dart';
 import 'package:carsbuzz/login/login_session.dart';
 import 'package:carsbuzz/theme/app_colors.dart';
+import 'package:carsbuzz/widgets/app_network_image.dart';
 import 'package:carsbuzz/widgets/notification_permission_prompt.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -291,9 +292,8 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: Image.network(car.images[i],
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F5F9))),
+              // CarThumbnailAdapter: car_placeholder while loading.
+              child: AppNetworkImage(car.images[i], fit: BoxFit.cover),
             ),
           ),
         ),

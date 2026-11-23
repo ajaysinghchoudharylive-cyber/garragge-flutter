@@ -1,4 +1,5 @@
 import 'package:carsbuzz/models/category_item.dart';
+import 'package:carsbuzz/widgets/app_network_image.dart';
 import 'package:flutter/material.dart';
 
 class ServiceItemCard extends StatefulWidget {
@@ -60,16 +61,10 @@ class _ServiceItemCardState extends State<ServiceItemCard> {
                   height: 100,
                   width: 100,
                   color: Colors.black,
-                  child: Image.network(
-                    widget.item.media.isNotEmpty
-                        ? widget.item.media.first.mediaUrl
-                        : '',
+                  // AdapterServicesDetails: car_placeholder while loading / on error.
+                  child: AppNetworkImage(
+                    widget.item.media.isNotEmpty ? widget.item.media.first.mediaUrl : null,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.car_repair,
-                      size: 60,
-                      color: Colors.white,
-                    ),
                   ),
                 ),
               ),

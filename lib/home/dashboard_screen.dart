@@ -8,6 +8,7 @@ import 'package:carsbuzz/notifications/notifications_screen.dart';
 import 'package:carsbuzz/home/widgets/find_cars_card.dart';
 import 'package:carsbuzz/models/car_brand_model.dart';
 import 'package:carsbuzz/theme/app_colors.dart';
+import 'package:carsbuzz/widgets/app_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -193,6 +194,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _bottomBanners.first.imageUrl,
                             width: double.infinity,
                             fit: BoxFit.fitWidth,
+                            // The height is unknown until the banner loads; reserve some space.
+                            frameBuilder: (_, child, frame, sync) => sync || frame != null
+                                ? child
+                                : const SizedBox(height: 120, child: CarPlaceholder()),
                             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                           ),
                         ),
@@ -368,14 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         SizedBox(
                           width: 34,
                           height: 34,
-                          child: brand.brandLogo == null
-                              ? const Icon(Icons.directions_car, color: Colors.black38)
-                              : Image.network(
-                                  brand.brandLogo!,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.directions_car, color: Colors.black38),
-                                ),
+                          child: AppNetworkImage(brand.brandLogo, fit: BoxFit.contain),
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -440,17 +438,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Padding(
                             padding: const EdgeInsets.all(4),
                             child: Center(
-                              child: m.imageUrl == null
-                                  ? const Icon(Icons.directions_car,
-                                      size: 48, color: Colors.black26)
-                                  : Image.network(
-                                      m.imageUrl!,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                          Icons.directions_car,
-                                          size: 48,
-                                          color: Colors.black26),
-                                    ),
+                              // PopularModelsAdapter: car_placeholder while loading / on error.
+                              child: AppNetworkImage(m.imageUrl, fit: BoxFit.contain),
                             ),
                           ),
                         ),
@@ -592,10 +581,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 115,
               width: double.infinity,
               color: AppColors.slate200,
-              child: n.imageUrl == null
-                  ? null
-                  : Image.network(n.imageUrl!,
-                      fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
+              // AllNewsAdapter: car_placeholder while loading / on error.
+              child: AppNetworkImage(n.imageUrl, fit: BoxFit.cover),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
@@ -729,9 +716,7 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                               errorBuilder: (_, __, ___) => const SizedBox()),
                         ),
                       ),
-                      Image.network(url,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const SizedBox()),
+                      AppNetworkImage(url, fit: BoxFit.contain),
                     ],
                   );
                 },

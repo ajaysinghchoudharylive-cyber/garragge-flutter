@@ -65,7 +65,7 @@ class _MainShellState extends State<MainShell> {
       case MainShell.tabDashboard:
         return const DashboardScreen();
       case MainShell.tabBuy:
-        return const CarListingScreen();
+        return CarListingScreen(onBack: () => _onTap(MainShell.tabDashboard));
       case MainShell.tabSell:
         return SellCarWizardScreen(onBack: () => _onTap(MainShell.tabDashboard));
       case MainShell.tabMore:
